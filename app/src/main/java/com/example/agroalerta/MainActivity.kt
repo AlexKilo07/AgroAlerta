@@ -4,13 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.*
 import com.example.agroalerta.ui.theme.AgroAlertaTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +13,32 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AgroAlertaTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                var currentScreen by remember { mutableStateOf("home") }
+                var selectedCuartel by remember { mutableStateOf("Cuartel 1") }
+
+                when (currentScreen) {
+                    "home" -> {
+                        HomeScreen(
+                            onCuartelSelected = { name ->
+                                selectedCuartel = name
+                                currentScreen = "detail"
+                            }
+                        )
+                    }
+                    "detail" -> {
+                        CuartelDetailScreen(
+                            cuartelName = selectedCuartel,
+                            onBackClick = { currentScreen = "home" },
+                            onNavigateToActuadores = { currentScreen = "actuadores" }
+                        )
+                    }
+                    "actuadores" -> {
+                        ActuadoresScreen(
+                            onBackClick = { currentScreen = "detail" }
+                        )
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AgroAlertaTheme {
-        Greeting("Android")
     }
 }

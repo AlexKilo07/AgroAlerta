@@ -2,10 +2,11 @@ package com.example.agroalerta.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val AgroGreenPrimary = Color(0xFF0F5233)
+val AgroGreenLight = Color(0xFFE8F5E9)
+val AgroGreenAccent = Color(0xFF2E7D32)
+val AgroBackground = Color(0xFFFBFBF9)
+val AgroCardBackground = Color(0xFFFFFFFF)
+val AgroStatusOk = Color(0xFF1B5E20)
+val AgroTextDark = Color(0xFF1C1B1F)
+val AgroTextMuted = Color(0xFF606060)
