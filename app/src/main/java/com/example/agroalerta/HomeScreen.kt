@@ -11,10 +11,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,17 +28,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.agroalerta.ui.theme.*
-import androidx.compose.material.icons.filled.Settings
 
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    selectedTab: Int = 0,
     onCuartelSelected: (String) -> Unit = {},
+    onNavigateToInicio: () -> Unit = {},
     onNavigateToAlertas: () -> Unit = {},
-    onNavigateToAjustes: () -> Unit = {}
+    onNavigateToAjustes: () -> Unit = {},
+    content: @Composable (PaddingValues) -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
-
     Scaffold(
         modifier = modifier,
         bottomBar = {
@@ -47,197 +48,199 @@ fun HomeScreen(
             ) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    onClick = { onNavigateToInicio() },
                     icon = { Icon(Icons.Default.Home, contentDescription = "Inicio") },
                     label = { Text("Inicio") }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
-                    onClick = {
-                        selectedTab = 1
-                        onNavigateToAlertas()
-                    },
+                    onClick = { onNavigateToAlertas() },
                     icon = { Icon(Icons.Default.Notifications, contentDescription = "Alertas") },
                     label = { Text("Alertas") }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
-                    onClick = {
-                        selectedTab = 2
-                        onNavigateToAjustes()
-                    },
+                    onClick = { onNavigateToAjustes() },
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Ajustes") },
                     label = { Text("Ajustes") }
                 )
             }
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(AgroBackground)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        content(innerPadding)
+    }
+}
+
+@Composable
+fun HomeContent(
+    paddingValues: PaddingValues,
+    onCuartelSelected: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .background(AgroBackground)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // 1. Encabezado principal
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Encabezado principal limpio
+            Text(
+                text = "AgroAlerta",
+                style = MaterialTheme.typography.headlineLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = AgroGreenPrimary
+                )
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF4CAF50))
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "En línea",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                    Text(
+                        text = "Sincronizado",
+                        style = MaterialTheme.typography.labelSmall.copy(color = AgroTextMuted)
+                    )
+                }
+            }
+        }
+
+        // 2. Tarjeta de Estado Global
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "AgroAlerta",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = AgroGreenPrimary
-                    )
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Estado OK",
+                    tint = AgroGreenPrimary,
+                    modifier = Modifier.size(56.dp)
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF4CAF50))
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = "Estado global",
+                        style = MaterialTheme.typography.titleMedium.copy(color = AgroTextMuted)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "En línea",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = "Normal",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = AgroGreenPrimary
                         )
-                        Text(
-                            text = "Sincronizado",
-                            style = MaterialTheme.typography.labelSmall.copy(color = AgroTextMuted)
-                        )
-                    }
+                    )
                 }
             }
+        }
 
-            // 2. Tarjeta de Estado Global
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        // 3. Selección de Cuarteles
+        Text(
+            text = "Seleccionar Cuartel",
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Bold,
+                color = AgroGreenPrimary
+            )
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CuartelCard(
+                title = "Cuartel 1",
+                status = "Estado OK",
+                modifier = Modifier.weight(1f),
+                onClick = { onCuartelSelected("Cuartel 1") }
+            )
+            CuartelCard(
+                title = "Cuartel 2",
+                status = "Estado OK",
+                modifier = Modifier.weight(1f),
+                onClick = { onCuartelSelected("Cuartel 2") }
+            )
+        }
+
+        // 4. Resumen General del Predio (4 Métricas)
+        Text(
+            text = "Resumen General del Predio",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = AgroGreenPrimary
+            )
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Estado OK",
-                        tint = AgroGreenPrimary,
-                        modifier = Modifier.size(56.dp)
+                    MetricItem(
+                        icon = Icons.Default.Thermostat,
+                        iconTint = Color(0xFFE57373),
+                        label = "Temp. Promedio",
+                        value = "18.5 °C",
+                        modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "Estado global",
-                            style = MaterialTheme.typography.titleMedium.copy(color = AgroTextMuted)
-                        )
-                        Text(
-                            text = "Normal",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = AgroGreenPrimary
-                            )
-                        )
-                    }
+                    MetricItem(
+                        icon = Icons.Default.WaterDrop,
+                        iconTint = Color(0xFF64B5F6),
+                        label = "Humedad Suelo",
+                        value = "68 %",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-            }
 
-            // 3. Selección de Cuarteles
-            Text(
-                text = "Seleccionar Cuartel",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = AgroGreenPrimary
-                )
-            )
+                HorizontalDivider(color = Color(0xFFEEEEEE))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                CuartelCard(
-                    title = "Cuartel 1",
-                    status = "Estado OK",
-                    modifier = Modifier.weight(1f),
-                    onClick = { onCuartelSelected("Cuartel 1") }
-                )
-                CuartelCard(
-                    title = "Cuartel 2",
-                    status = "Estado OK",
-                    modifier = Modifier.weight(1f),
-                    onClick = { onCuartelSelected("Cuartel 2") }
-                )
-            }
-
-            // 4. Resumen General del Predio (4 Métricas)
-            Text(
-                text = "Resumen General del Predio",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = AgroGreenPrimary
-                )
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        MetricItem(
-                            icon = Icons.Default.Thermostat,
-                            iconTint = Color(0xFFE57373),
-                            label = "Temp. Promedio",
-                            value = "18.5 °C",
-                            modifier = Modifier.weight(1f)
-                        )
-                        MetricItem(
-                            icon = Icons.Default.WaterDrop,
-                            iconTint = Color(0xFF64B5F6),
-                            label = "Humedad Suelo",
-                            value = "68 %",
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    Divider(color = Color(0xFFEEEEEE))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        MetricItem(
-                            icon = Icons.Default.Speed,
-                            iconTint = Color(0xFF81C784),
-                            label = "Caudal Riego",
-                            value = "45 L/min",
-                            modifier = Modifier.weight(1f)
-                        )
-                        MetricItem(
-                            icon = Icons.Default.WbSunny, // <-- Cambiado a WbSunny
-                            iconTint = Color(0xFFFFB74D),
-                            label = "Radiación Solar",
-                            value = "650 W/m²",
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    MetricItem(
+                        icon = Icons.Default.Speed,
+                        iconTint = Color(0xFF81C784),
+                        label = "Caudal Riego",
+                        value = "45 L/min",
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricItem(
+                        icon = Icons.Default.WbSunny,
+                        iconTint = Color(0xFFFFB74D),
+                        label = "Radiación Solar",
+                        value = "650 W/m²",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -303,6 +306,8 @@ fun CuartelCard(
 @Composable
 fun HomeScreenPreview() {
     AgroAlertaTheme {
-        HomeScreen()
+        HomeScreen { padding ->
+            HomeContent(paddingValues = padding, onCuartelSelected = {})
+        }
     }
 }
