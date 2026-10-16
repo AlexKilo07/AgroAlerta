@@ -1,5 +1,7 @@
 package com.example.agroalerta.ui.theme
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,37 +27,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Modelos de datos
 data class AlertModel(
     val id: Int,
     val type: String,
-    val isWarning: Boolean // true: Helada (Rojo), false: Fuga (Verde)
+    val isWarning: Boolean
 )
 
 data class HistoryEventModel(
     val id: Int,
     val date: String,
     val title: String,
-    val status: String, // "Atendida." o "Resuelto."
+    val status: String,
     val icon: ImageVector,
     val iconTint: Color
 )
 
 @Composable
 fun AlertsScreen() {
-    var selectedTab by remember { mutableStateOf(0) } // 0: Activas, 1: Historial
+    var selectedTab by remember { mutableStateOf(0) }
 
-    // Datos de ejemplo para Alertas Activas
+    // Lista mutable interactiva
     val activeAlerts = remember {
-        listOf(
+        mutableStateListOf(
             AlertModel(1, "Riesgo de Helada", isWarning = true),
             AlertModel(2, "Riesgo de Helada", isWarning = true),
-            AlertModel(3, "Fuga", isWarning = false),
-            AlertModel(4, "Fuga", isWarning = false)
+            AlertModel(3, "Fuga en Cañería Principal", isWarning = false),
+            AlertModel(4, "Bajo Nivel de Estanque", isWarning = false)
         )
     }
 
-    // Datos de ejemplo para Historial de Eventos
     val historyEvents = remember {
         listOf(
             HistoryEventModel(
@@ -72,7 +72,7 @@ fun AlertsScreen() {
                 title = "Bajo nivel de estanque",
                 status = "Resuelto.",
                 icon = Icons.Default.WaterDrop,
-                iconTint = Color(0xFF0F382C)
+                iconTint = AgroGreenPrimary
             )
         )
     }
@@ -80,19 +80,17 @@ fun AlertsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFAFAFA))
+            .background(AgroBackground)
             .padding(16.dp)
     ) {
-        // Título Principal Dinámico según Pestaña
         Text(
             text = if (selectedTab == 0) "Alertas Activas" else "Historial",
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F382C),
+            color = AgroGreenPrimary,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Botones de Selector de Pestaña (Tabs)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -103,53 +101,58 @@ fun AlertsScreen() {
                 onClick = { selectedTab = 0 },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedTab == 0) Color(0xFF0F382C) else Color.Transparent,
-                    contentColor = if (selectedTab == 0) Color.White else Color(0xFF0F382C)
+                    containerColor = if (selectedTab == 0) AgroGreenPrimary else Color.Transparent,
+                    contentColor = if (selectedTab == 0) Color.White else AgroGreenPrimary
                 ),
                 shape = RoundedCornerShape(8.dp),
                 elevation = null
             ) {
-                Text(
-                    text = "Alertas Activas",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Alertas Activas", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
 
             Button(
                 onClick = { selectedTab = 1 },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedTab == 1) Color(0xFF0F382C) else Color.Transparent,
-                    contentColor = if (selectedTab == 1) Color.White else Color(0xFF0F382C)
+                    containerColor = if (selectedTab == 1) AgroGreenPrimary else Color.Transparent,
+                    contentColor = if (selectedTab == 1) Color.White else AgroGreenPrimary
                 ),
                 shape = RoundedCornerShape(8.dp),
                 elevation = null
             ) {
-                Text(
-                    text = "Historial de Eventos",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Historial de Eventos", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Contenido según la pestaña seleccionada
         if (selectedTab == 0) {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
-            ) {
-                items(activeAlerts) { alert ->
-                    AlertCardItem(alert = alert)
+            if (activeAlerts.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No hay alertas activas en este momento",
+                        color = AgroTextMuted,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(activeAlerts, key = { it.id }) { alert ->
+                        AlertCardItem(
+                            alert = alert,
+                            onDismiss = { activeAlerts.remove(alert) }
+                        )
+                    }
                 }
             }
         } else {
-            // VISTA DE HISTORIAL DE EVENTOS
             Column {
-                // Filtros de Fecha y Tipo de evento
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -162,17 +165,17 @@ fun AlertsScreen() {
                             .padding(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Selector Fecha
                         FilterSelector(
                             icon = Icons.Default.DateRange,
                             label = "Fecha",
+                            options = listOf("Hoy", "Última semana", "Último mes"),
                             modifier = Modifier.weight(1f)
                         )
 
-                        // Selector Tipo de evento
                         FilterSelector(
                             icon = Icons.Default.Spa,
                             label = "Tipo de evento",
+                            options = listOf("Todos", "Helada", "Fuga", "Riego"),
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -180,10 +183,7 @@ fun AlertsScreen() {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Lista Timeline del Historial
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = 16.dp)
-                ) {
+                LazyColumn(contentPadding = PaddingValues(bottom = 16.dp)) {
                     items(historyEvents) { event ->
                         TimelineEventItem(event = event)
                     }
@@ -197,23 +197,22 @@ fun AlertsScreen() {
 fun FilterSelector(
     icon: ImageVector,
     label: String,
+    options: List<String>,
     modifier: Modifier = Modifier
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    var selectedOption by remember { mutableStateOf(options.firstOrNull() ?: "") }
+
     Column(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = Color(0xFF0F382C),
+                tint = AgroGreenPrimary,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = label,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF0F382C)
-            )
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AgroGreenPrimary)
         }
         Spacer(modifier = Modifier.height(6.dp))
         Box(
@@ -221,19 +220,35 @@ fun FilterSelector(
                 .fillMaxWidth()
                 .background(Color(0xFFF2F6F3), shape = RoundedCornerShape(12.dp))
                 .border(1.dp, Color(0xFFE0EAE3), shape = RoundedCornerShape(12.dp))
-                .clickable { /* Abrir selector */ }
+                .clickable { expanded = true }
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Text(selectedOption, fontSize = 12.sp, color = AgroTextDark)
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = "Expandir",
-                    tint = Color(0xFF0F382C)
+                    tint = AgroGreenPrimary
                 )
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            selectedOption = option
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -247,7 +262,6 @@ fun TimelineEventItem(event: HistoryEventModel) {
             .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Columna de Línea de tiempo (Timeline Indicator)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -258,7 +272,7 @@ fun TimelineEventItem(event: HistoryEventModel) {
                 modifier = Modifier
                     .size(14.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF0F382C))
+                    .background(AgroGreenPrimary)
                     .border(3.dp, Color(0xFFE0EAE3), CircleShape)
             )
             Box(
@@ -271,7 +285,6 @@ fun TimelineEventItem(event: HistoryEventModel) {
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // Tarjeta del Evento
         Card(
             modifier = Modifier
                 .weight(1f)
@@ -286,7 +299,6 @@ fun TimelineEventItem(event: HistoryEventModel) {
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Círculo con Icono
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -304,16 +316,14 @@ fun TimelineEventItem(event: HistoryEventModel) {
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                // Texto del Evento
                 Text(
-                    text = "[${event.date}] – ${event.title} – ",
+                    text = "[${event.date}] – ${event.title}",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F382C),
+                    color = AgroGreenPrimary,
                     modifier = Modifier.weight(1f)
                 )
 
-                // Tag/Badge Estado (Atendida / Resuelto)
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Color(0xFFEAF2EB)
@@ -322,7 +332,7 @@ fun TimelineEventItem(event: HistoryEventModel) {
                         text = event.status,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F382C),
+                        color = AgroGreenPrimary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
@@ -332,9 +342,9 @@ fun TimelineEventItem(event: HistoryEventModel) {
 }
 
 @Composable
-fun AlertCardItem(alert: AlertModel) {
+fun AlertCardItem(alert: AlertModel, onDismiss: () -> Unit) {
     val cardBgColor = if (alert.isWarning) Color(0xFFFFF0F0) else Color(0xFFF2F8F4)
-    val mainColor = if (alert.isWarning) Color(0xFFD9383A) else Color(0xFF0F382C)
+    val mainColor = if (alert.isWarning) Color(0xFFD9383A) else AgroGreenPrimary
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -360,27 +370,19 @@ fun AlertCardItem(alert: AlertModel) {
                     text = alert.type,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F382C)
+                    color = AgroGreenPrimary
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Cuartel afectado",
-                    fontSize = 12.sp,
-                    color = Color.DarkGray
-                )
+                Text("Cuartel afectado", fontSize = 12.sp, color = Color.DarkGray)
             }
 
             Button(
-                onClick = { /* Acción para marcar vista */ },
+                onClick = onDismiss,
                 colors = ButtonDefaults.buttonColors(containerColor = mainColor),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = "Marcar como vista",
-                    color = Color.White,
-                    fontSize = 11.sp
-                )
+                Text("Marcar como vista", color = Color.White, fontSize = 11.sp)
             }
         }
     }
