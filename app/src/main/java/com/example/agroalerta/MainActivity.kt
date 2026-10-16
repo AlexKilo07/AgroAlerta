@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.agroalerta.ui.theme.AgroAlertaTheme
 import com.example.agroalerta.ui.theme.AlertsScreen
+import com.example.agroalerta.ui.theme.SettingsScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,8 +48,9 @@ class MainActivity : ComponentActivity() {
                                     AlertsScreen()
                                 }
                                 "settings" -> Box(modifier = Modifier.padding(paddingValues)) {
-                                    Text("Pantalla de Ajustes")
+                                    SettingsScreen()
                                 }
+
                             }
                         }
                     }
