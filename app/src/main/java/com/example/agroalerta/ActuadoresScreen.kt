@@ -19,26 +19,27 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.agroalerta.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActuadoresScreen(
-    onBackClick: () -> Unit = {}
+    cuartelName: String = "Cuartel 1",
+    onBackClick: () -> Unit = {},
+    viewModel: ActuadoresViewModel = viewModel()
 ) {
-    var bombaEncendida by remember { mutableStateOf(true) }
-    var valvulaAbierta by remember { mutableStateOf(true) }
-    var antiHeladasActivo by remember { mutableStateOf(false) }
+    val actuadoresMap by viewModel.actuadoresMap.collectAsState()
+    val estadoActuadores = actuadoresMap[cuartelName] ?: EstadoActuadores(cuartelId = cuartelName)
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Estado de Actuadores",
+                        text = "Actuadores - $cuartelName",
                         fontWeight = FontWeight.Bold,
                         color = AgroGreenPrimary
                     )
@@ -72,8 +73,8 @@ fun ActuadoresScreen(
                 title = "Bomba de Impulsión:",
                 option1Label = "Encendida",
                 option2Label = "Apagada",
-                isOption1Selected = bombaEncendida,
-                onOptionSelected = { bombaEncendida = it }
+                isOption1Selected = estadoActuadores.bombaEncendida,
+                onOptionSelected = { viewModel.toggleBomba(cuartelName, it) }
             )
 
             // 2. Válvula de Riego
@@ -83,8 +84,8 @@ fun ActuadoresScreen(
                 title = "Válvula de Riego:",
                 option1Label = "Abierta",
                 option2Label = "Cerrada",
-                isOption1Selected = valvulaAbierta,
-                onOptionSelected = { valvulaAbierta = it }
+                isOption1Selected = estadoActuadores.valvulaAbierta,
+                onOptionSelected = { viewModel.toggleValvula(cuartelName, it) }
             )
 
             // 3. Sistema Anti-heladas
@@ -94,8 +95,8 @@ fun ActuadoresScreen(
                 title = "Sistema Anti-heladas:",
                 option1Label = "Activo",
                 option2Label = "Inactivo",
-                isOption1Selected = antiHeladasActivo,
-                onOptionSelected = { antiHeladasActivo = it }
+                isOption1Selected = estadoActuadores.antiHeladasActivo,
+                onOptionSelected = { viewModel.toggleAntiHeladas(cuartelName, it) }
             )
         }
     }
@@ -122,7 +123,6 @@ fun ActuadorCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Fila 1: Ícono + Título completo
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -151,10 +151,9 @@ fun ActuadorCard(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Divider(color = Color(0xFFF0F0F0))
+            HorizontalDivider(color = Color(0xFFF0F0F0))
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Fila 2: Selectores/RadioButtons distribuidos equitativamente
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -194,12 +193,3 @@ fun ActuadorCard(
         }
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-fun ActuadoresScreenPreview() {
-    AgroAlertaTheme {
-        ActuadoresScreen()
-    }
-}
-

@@ -155,7 +155,7 @@ fun HomeContent(
             }
         }
 
-        // 3. Selección de Cuarteles
+        // 3. Selección de Cuarteles (4 Cuarteles)
         Text(
             text = "Seleccionar Cuartel",
             style = MaterialTheme.typography.titleLarge.copy(
@@ -164,6 +164,7 @@ fun HomeContent(
             )
         )
 
+        // Fila 1: Cuartel 1 y Cuartel 2
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -179,6 +180,25 @@ fun HomeContent(
                 status = "Estado OK",
                 modifier = Modifier.weight(1f),
                 onClick = { onCuartelSelected("Cuartel 2") }
+            )
+        }
+
+        // Fila 2: Cuartel 3 y Cuartel 4
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CuartelCard(
+                title = "Cuartel 3",
+                status = "Riesgo Helada",
+                modifier = Modifier.weight(1f),
+                onClick = { onCuartelSelected("Cuartel 3") }
+            )
+            CuartelCard(
+                title = "Cuartel 4",
+                status = "Falta de Riego",
+                modifier = Modifier.weight(1f),
+                onClick = { onCuartelSelected("Cuartel 4") }
             )
         }
 
@@ -296,7 +316,9 @@ fun CuartelCard(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = status,
-                style = MaterialTheme.typography.bodyMedium.copy(color = AgroStatusOk)
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = if (status == "Estado OK") AgroStatusOk else Color(0xFFD9383A)
+                )
             )
         }
     }

@@ -1,7 +1,5 @@
 package com.example.agroalerta.ui.theme
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,12 +24,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-data class AlertModel(
-    val id: Int,
-    val type: String,
-    val isWarning: Boolean
-)
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.agroalerta.AlertaItem
+import com.example.agroalerta.AlertsViewModel
 
 data class HistoryEventModel(
     val id: Int,
@@ -43,18 +38,11 @@ data class HistoryEventModel(
 )
 
 @Composable
-fun AlertsScreen() {
+fun AlertsScreen(
+    viewModel: AlertsViewModel = viewModel()
+) {
     var selectedTab by remember { mutableStateOf(0) }
-
-    // Lista mutable interactiva
-    val activeAlerts = remember {
-        mutableStateListOf(
-            AlertModel(1, "Riesgo de Helada", isWarning = true),
-            AlertModel(2, "Riesgo de Helada", isWarning = true),
-            AlertModel(3, "Fuga en Cañería Principal", isWarning = false),
-            AlertModel(4, "Bajo Nivel de Estanque", isWarning = false)
-        )
-    }
+    val activeAlerts by viewModel.alertasActivas.collectAsState()
 
     val historyEvents = remember {
         listOf(
@@ -146,7 +134,7 @@ fun AlertsScreen() {
                     items(activeAlerts, key = { it.id }) { alert ->
                         AlertCardItem(
                             alert = alert,
-                            onDismiss = { activeAlerts.remove(alert) }
+                            onDismiss = { viewModel.marcarComoVista(alert.id) }
                         )
                     }
                 }
@@ -342,9 +330,9 @@ fun TimelineEventItem(event: HistoryEventModel) {
 }
 
 @Composable
-fun AlertCardItem(alert: AlertModel, onDismiss: () -> Unit) {
-    val cardBgColor = if (alert.isWarning) Color(0xFFFFF0F0) else Color(0xFFF2F8F4)
-    val mainColor = if (alert.isWarning) Color(0xFFD9383A) else AgroGreenPrimary
+fun AlertCardItem(alert: AlertaItem, onDismiss: () -> Unit) {
+    val cardBgColor = if (alert.esCritica) Color(0xFFFFF0F0) else Color(0xFFF2F8F4)
+    val mainColor = if (alert.esCritica) Color(0xFFD9383A) else AgroGreenPrimary
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -367,13 +355,17 @@ fun AlertCardItem(alert: AlertModel, onDismiss: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = alert.type,
+                    text = alert.titulo,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = AgroGreenPrimary
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text("Cuartel afectado", fontSize = 12.sp, color = Color.DarkGray)
+                Text(
+                    text = "Cuartel: ${alert.cuartel}",
+                    fontSize = 12.sp,
+                    color = Color.DarkGray
+                )
             }
 
             Button(
