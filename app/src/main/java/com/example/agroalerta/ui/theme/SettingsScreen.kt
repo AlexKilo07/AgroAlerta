@@ -6,10 +6,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,11 +22,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.agroalerta.AgroRepository
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen() {
     // Estados temporales para los switches e interacción gráfica
     var pushNotificationsEnabled by remember { mutableStateOf(true) }
+
+    // Estados para la sección de simulación
+    var cuartelSeleccionado by remember { mutableStateOf("Cuartel 1") }
+    val cuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4")
+    var expandedMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -85,7 +95,108 @@ fun SettingsScreen() {
             }
         }
 
-        // 2. Sección Notificaciones
+        // 2. NUEVA SECCIÓN: Simulador de Telemetría
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Science,
+                        contentDescription = "Simulación",
+                        tint = Color(0xFF0F382C),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Simulador de Telemetría",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F382C)
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                Text(
+                    text = "Selecciona un cuartel para cambiar su clima en vivo:",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+
+                // Desplegable de selección de Cuartel
+                ExposedDropdownMenuBox(
+                    expanded = expandedMenu,
+                    onExpandedChange = { expandedMenu = !expandedMenu }
+                ) {
+                    OutlinedTextField(
+                        value = cuartelSeleccionado,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Cuartel Objetivo") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMenu) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedMenu,
+                        onDismissRequest = { expandedMenu = false }
+                    ) {
+                        cuarteles.forEach { cuartel ->
+                            DropdownMenuItem(
+                                text = { Text(cuartel) },
+                                onClick = {
+                                    cuartelSeleccionado = cuartel
+                                    expandedMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Botón Forzar Helada (-2.1 °C)
+                    Button(
+                        onClick = {
+                            AgroRepository.simularHelada(cuartelSeleccionado)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9383A))
+                    ) {
+                        Icon(Icons.Default.AcUnit, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Simular Helada", fontSize = 12.sp)
+                    }
+
+                    // Botón Restablecer Normalidad
+                    Button(
+                        onClick = {
+                            AgroRepository.restaurarEstadoNormal(cuartelSeleccionado)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F382C))
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Restablecer", fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
+        // 3. Sección Notificaciones
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -137,7 +248,7 @@ fun SettingsScreen() {
             }
         }
 
-        // 3. Sección Sincronización
+        // 4. Sección Sincronización
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -186,7 +297,7 @@ fun SettingsScreen() {
             }
         }
 
-        // 4. Sección Información del Sistema (Detalle adicional importante)
+        // 5. Sección Información del Sistema
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),

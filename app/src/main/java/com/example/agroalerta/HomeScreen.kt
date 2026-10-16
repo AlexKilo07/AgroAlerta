@@ -10,12 +10,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Thermostat
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -76,6 +76,17 @@ fun HomeContent(
     paddingValues: PaddingValues,
     onCuartelSelected: (String) -> Unit
 ) {
+    // Escuchar el StateFlow de la telemetría y actuadores en tiempo real desde el Repositorio
+    val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
+    val actuadoresMap by AgroRepository.actuadoresMap.collectAsState()
+    val visitasGps by AgroRepository.visitasGps.collectAsState()
+
+    // Cálculo dinámico de métricas operativas
+    val totalCuarteles = telemetriaMap.size
+    val cuartelesEnRiesgo = telemetriaMap.values.count { it.tieneRiesgo }
+    val bombasEncendidas = actuadoresMap.values.count { it.bombaEncendida }
+    val ultimaVisita = visitasGps.lastOrNull()?.fechaHora ?: "Sin registros hoy"
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -119,7 +130,7 @@ fun HomeContent(
             }
         }
 
-        // 2. Tarjeta de Estado Global
+        // 2. Tarjeta de Estado Global Dinámica
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -133,22 +144,23 @@ fun HomeContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Estado OK",
-                    tint = AgroGreenPrimary,
+                    imageVector = if (cuartelesEnRiesgo > 0) Icons.Default.Warning else Icons.Default.CheckCircle,
+                    contentDescription = "Estado Global",
+                    tint = if (cuartelesEnRiesgo > 0) Color(0xFFD9383A) else AgroGreenPrimary,
                     modifier = Modifier.size(56.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        text = "Estado global",
+                        text = "Estado global del predio",
                         style = MaterialTheme.typography.titleMedium.copy(color = AgroTextMuted)
                     )
                     Text(
-                        text = "Normal",
+                        text = if (cuartelesEnRiesgo > 0) "$cuartelesEnRiesgo Zonas en Riesgo" else "Normal (Óptimo)",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = AgroGreenPrimary
+                            color = if (cuartelesEnRiesgo > 0) Color(0xFFD9383A) else AgroGreenPrimary,
+                            fontSize = 20.sp
                         )
                     )
                 }
@@ -169,15 +181,18 @@ fun HomeContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            val c1 = telemetriaMap["Cuartel 1"]
             CuartelCard(
                 title = "Cuartel 1",
-                status = "Estado OK",
+                status = c1?.estadoGlobal ?: "Estado OK",
                 modifier = Modifier.weight(1f),
                 onClick = { onCuartelSelected("Cuartel 1") }
             )
+
+            val c2 = telemetriaMap["Cuartel 2"]
             CuartelCard(
                 title = "Cuartel 2",
-                status = "Estado OK",
+                status = c2?.estadoGlobal ?: "Estado OK",
                 modifier = Modifier.weight(1f),
                 onClick = { onCuartelSelected("Cuartel 2") }
             )
@@ -188,23 +203,26 @@ fun HomeContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            val c3 = telemetriaMap["Cuartel 3"]
             CuartelCard(
                 title = "Cuartel 3",
-                status = "Riesgo Helada",
+                status = c3?.estadoGlobal ?: "Riesgo Helada",
                 modifier = Modifier.weight(1f),
                 onClick = { onCuartelSelected("Cuartel 3") }
             )
+
+            val c4 = telemetriaMap["Cuartel 4"]
             CuartelCard(
                 title = "Cuartel 4",
-                status = "Falta de Riego",
+                status = c4?.estadoGlobal ?: "Falta de Riego",
                 modifier = Modifier.weight(1f),
                 onClick = { onCuartelSelected("Cuartel 4") }
             )
         }
 
-        // 4. Resumen General del Predio (4 Métricas)
+        // 4. NUEVO: Centro de Control y Monitoreo Operativo
         Text(
-            text = "Resumen General del Predio",
+            text = "Centro de Control Operativo",
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = AgroGreenPrimary
@@ -226,17 +244,17 @@ fun HomeContent(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     MetricItem(
-                        icon = Icons.Default.Thermostat,
-                        iconTint = Color(0xFFE57373),
-                        label = "Temp. Promedio",
-                        value = "18.5 °C",
+                        icon = Icons.Default.Power,
+                        iconTint = Color(0xFF4CAF50),
+                        label = "Bombas Activas",
+                        value = "$bombasEncendidas / $totalCuarteles encendidas",
                         modifier = Modifier.weight(1f)
                     )
                     MetricItem(
-                        icon = Icons.Default.WaterDrop,
-                        iconTint = Color(0xFF64B5F6),
-                        label = "Humedad Suelo",
-                        value = "68 %",
+                        icon = Icons.Default.Shield,
+                        iconTint = Color(0xFF2196F3),
+                        label = "Zonas Protegidas",
+                        value = "${totalCuarteles - cuartelesEnRiesgo} / $totalCuarteles en OK",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -248,17 +266,17 @@ fun HomeContent(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     MetricItem(
-                        icon = Icons.Default.Speed,
-                        iconTint = Color(0xFF81C784),
-                        label = "Caudal Riego",
-                        value = "45 L/min",
+                        icon = Icons.Default.Warning,
+                        iconTint = Color(0xFFFF9800),
+                        label = "Alertas Activas",
+                        value = "$cuartelesEnRiesgo pendientes",
                         modifier = Modifier.weight(1f)
                     )
                     MetricItem(
-                        icon = Icons.Default.WbSunny,
-                        iconTint = Color(0xFFFFB74D),
-                        label = "Radiación Solar",
-                        value = "650 W/m²",
+                        icon = Icons.Default.LocationOn,
+                        iconTint = Color(0xFF9C27B0),
+                        label = "Último Registro GPS",
+                        value = ultimaVisita,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -288,7 +306,7 @@ fun MetricItem(
         Spacer(modifier = Modifier.width(8.dp))
         Column {
             Text(label, fontSize = 11.sp, color = AgroTextMuted)
-            Text(value, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(value, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = AgroTextDark)
         }
     }
 }

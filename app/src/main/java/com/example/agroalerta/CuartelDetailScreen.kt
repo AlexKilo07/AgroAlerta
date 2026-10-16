@@ -17,13 +17,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.draw.clip
 import com.example.agroalerta.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +33,24 @@ fun CuartelDetailScreen(
     onBackClick: () -> Unit = {},
     onNavigateToActuadores: () -> Unit = {}
 ) {
+    // 1. Simular lectura aleatoria de sensores al abrir cada cuartel
+    LaunchedEffect(cuartelName) {
+        AgroRepository.actualizarLecturasAleatorias(cuartelName)
+    }
+
+    // 2. Escuchar la telemetría en tiempo real desde el Repositorio
+    val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
+
+    // 3. Obtener los datos específicos del cuartel seleccionado
+    val cuartelInfo = telemetriaMap[cuartelName] ?: TelemetriaCuartel(
+        cuartelId = cuartelName,
+        temperatura = "-- °C",
+        humedadSuelo = "-- %",
+        caudal = "-- L/min",
+        radiacionSolar = "-- W/m²",
+        humedadRelativa = "-- %"
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -61,7 +79,9 @@ fun CuartelDetailScreen(
         ) {
             // 1. Botón de Acción Principal: Registrar Visita GPS
             Button(
-                onClick = { /* Acción GPS */ },
+                onClick = {
+                    AgroRepository.registrarVisitaTerreno(cuartelName, -33.7251, -70.7320)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -90,7 +110,7 @@ fun CuartelDetailScreen(
                 )
             )
 
-            // 2. Grilla de Tarjetas de Sensores
+            // 2. Grilla de Tarjetas de Sensores DINÁMICAS (Conectadas a cuartelInfo)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -99,14 +119,14 @@ fun CuartelDetailScreen(
                     icon = Icons.Default.Thermostat,
                     iconTint = Color(0xFFE57373),
                     title = "Temperatura",
-                    value = "19.2 °C",
+                    value = cuartelInfo.temperatura,
                     modifier = Modifier.weight(1f)
                 )
                 SensorCard(
                     icon = Icons.Default.WaterDrop,
                     iconTint = Color(0xFF64B5F6),
                     title = "Humedad Suelo",
-                    value = "64 %",
+                    value = cuartelInfo.humedadSuelo,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -119,14 +139,14 @@ fun CuartelDetailScreen(
                     icon = Icons.Default.Speed,
                     iconTint = Color(0xFF81C784),
                     title = "Caudal",
-                    value = "42 L/min",
+                    value = cuartelInfo.caudal,
                     modifier = Modifier.weight(1f)
                 )
                 SensorCard(
                     icon = Icons.Default.WbSunny,
                     iconTint = Color(0xFFFFB74D),
                     title = "Radiación Solar",
-                    value = "620 W/m²",
+                    value = cuartelInfo.radiacionSolar,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -139,7 +159,7 @@ fun CuartelDetailScreen(
                     icon = Icons.Default.WaterDrop,
                     iconTint = Color(0xFF4DD0E1),
                     title = "Humedad Relativa",
-                    value = "55 %",
+                    value = cuartelInfo.humedadRelativa,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.weight(1f)) // Espacio para mantener el equilibrio visual

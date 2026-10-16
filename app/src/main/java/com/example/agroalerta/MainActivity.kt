@@ -15,6 +15,10 @@ import com.example.agroalerta.ui.theme.SettingsScreen
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Inicializar SQLite nativo de Android
+        AgroRepository.init(applicationContext)
+
         enableEdgeToEdge()
         setContent {
             AgroAlertaTheme {
