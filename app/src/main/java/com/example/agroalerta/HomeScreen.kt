@@ -15,7 +15,11 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -220,7 +224,7 @@ fun HomeContent(
             )
         }
 
-        // 4. NUEVO: Centro de Control y Monitoreo Operativo
+        // 4. Centro de Control Operativo
         Text(
             text = "Centro de Control Operativo",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -277,6 +281,69 @@ fun HomeContent(
                         iconTint = Color(0xFF9C27B0),
                         label = "Último Registro GPS",
                         value = ultimaVisita,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        // 5. Resumen General del Predio (Telemetría Promedio)
+        Text(
+            text = "Resumen General del Predio",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = AgroGreenPrimary
+            )
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    MetricItem(
+                        icon = Icons.Default.Thermostat,
+                        iconTint = Color(0xFFE57373),
+                        label = "Temp. Promedio",
+                        value = "18.5 °C",
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricItem(
+                        icon = Icons.Default.WaterDrop,
+                        iconTint = Color(0xFF64B5F6),
+                        label = "Humedad Suelo",
+                        value = "68 %",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    MetricItem(
+                        icon = Icons.Default.Speed,
+                        iconTint = Color(0xFF81C784),
+                        label = "Caudal Riego",
+                        value = "45 L/min",
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricItem(
+                        icon = Icons.Default.WbSunny,
+                        iconTint = Color(0xFFFFB74D),
+                        label = "Radiación Solar",
+                        value = "650 W/m²",
                         modifier = Modifier.weight(1f)
                     )
                 }
