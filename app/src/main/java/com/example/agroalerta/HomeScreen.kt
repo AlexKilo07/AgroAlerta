@@ -80,7 +80,7 @@ fun HomeContent(
     paddingValues: PaddingValues,
     onCuartelSelected: (String) -> Unit
 ) {
-    // Escuchar el StateFlow de la telemetría y actuadores en tiempo real desde el Repositorio
+    // Escuchar el StateFlow de telemetría, actuadores y visitas GPS desde AgroRepository
     val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
     val actuadoresMap by AgroRepository.actuadoresMap.collectAsState()
     val visitasGps by AgroRepository.visitasGps.collectAsState()
@@ -89,7 +89,11 @@ fun HomeContent(
     val totalCuarteles = telemetriaMap.size
     val cuartelesEnRiesgo = telemetriaMap.values.count { it.tieneRiesgo }
     val bombasEncendidas = actuadoresMap.values.count { it.bombaEncendida }
-    val ultimaVisita = visitasGps.lastOrNull()?.fechaHora ?: "Sin registros hoy"
+
+    // Obtener la fecha y hora de la última inspección realizada
+    val ultimaVisita = visitasGps.firstOrNull()?.let {
+        "${it.cuartel} (${it.fechaHora})"
+    } ?: "Sin registros hoy"
 
     Column(
         modifier = Modifier
@@ -180,7 +184,6 @@ fun HomeContent(
             )
         )
 
-        // Fila 1: Cuartel 1 y Cuartel 2
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -202,7 +205,6 @@ fun HomeContent(
             )
         }
 
-        // Fila 2: Cuartel 3 y Cuartel 4
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -224,70 +226,7 @@ fun HomeContent(
             )
         }
 
-        // 4. Centro de Control Operativo
-        Text(
-            text = "Centro de Control Operativo",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = AgroGreenPrimary
-            )
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    MetricItem(
-                        icon = Icons.Default.Power,
-                        iconTint = Color(0xFF4CAF50),
-                        label = "Bombas Activas",
-                        value = "$bombasEncendidas / $totalCuarteles encendidas",
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        icon = Icons.Default.Shield,
-                        iconTint = Color(0xFF2196F3),
-                        label = "Zonas Protegidas",
-                        value = "${totalCuarteles - cuartelesEnRiesgo} / $totalCuarteles en OK",
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    MetricItem(
-                        icon = Icons.Default.Warning,
-                        iconTint = Color(0xFFFF9800),
-                        label = "Alertas Activas",
-                        value = "$cuartelesEnRiesgo pendientes",
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        icon = Icons.Default.LocationOn,
-                        iconTint = Color(0xFF9C27B0),
-                        label = "Último Registro GPS",
-                        value = ultimaVisita,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-
-        // 5. Resumen General del Predio (Telemetría Promedio)
+        // 4. Resumen General del Predio (Telemetría Promedio)
         Text(
             text = "Resumen General del Predio",
             style = MaterialTheme.typography.titleMedium.copy(
@@ -344,6 +283,69 @@ fun HomeContent(
                         iconTint = Color(0xFFFFB74D),
                         label = "Radiación Solar",
                         value = "650 W/m²",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        // 5. Centro de Control Operativo
+        Text(
+            text = "Centro de Control Operativo",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                color = AgroGreenPrimary
+            )
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    MetricItem(
+                        icon = Icons.Default.Power,
+                        iconTint = Color(0xFF4CAF50),
+                        label = "Bombas Activas",
+                        value = "$bombasEncendidas / $totalCuarteles encendidas",
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricItem(
+                        icon = Icons.Default.Shield,
+                        iconTint = Color(0xFF2196F3),
+                        label = "Zonas Protegidas",
+                        value = "${totalCuarteles - cuartelesEnRiesgo} / $totalCuarteles en OK",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    MetricItem(
+                        icon = Icons.Default.Warning,
+                        iconTint = Color(0xFFFF9800),
+                        label = "Alertas Activas",
+                        value = "$cuartelesEnRiesgo pendientes",
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricItem(
+                        icon = Icons.Default.LocationOn,
+                        iconTint = Color(0xFF9C27B0),
+                        label = "Último Registro GPS",
+                        value = ultimaVisita,
                         modifier = Modifier.weight(1f)
                     )
                 }

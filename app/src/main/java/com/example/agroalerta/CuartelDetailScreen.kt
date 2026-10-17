@@ -1,5 +1,11 @@
 package com.example.agroalerta
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -20,28 +26,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.agroalerta.ui.theme.*
+import com.google.android.gms.location.LocationServices
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CuartelDetailScreen(
     cuartelName: String = "Cuartel 1",
     onBackClick: () -> Unit = {},
-    onNavigateToActuadores: () -> Unit = {}
+    onNavigateToActuadores: () -> Unit = {},
+    onNavigateToHistorial: () -> Unit = {}
 ) {
-    // 1. Simular lectura aleatoria de sensores al abrir cada cuartel
-    LaunchedEffect(cuartelName) {
-        AgroRepository.actualizarLecturasAleatorias(cuartelName)
-    }
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-    // 2. Escuchar la telemetría en tiempo real desde el Repositorio
+    // NOTA: Se eliminó el LaunchedEffect que regeneraba la telemetría al entrar.
+
+    // 1. Escuchar la telemetría en tiempo real desde el Repositorio
     val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
 
-    // 3. Obtener los datos específicos del cuartel seleccionado
+    // 2. Obtener los datos específicos del cuartel seleccionado
     val cuartelInfo = telemetriaMap[cuartelName] ?: TelemetriaCuartel(
         cuartelId = cuartelName,
         temperatura = "-- °C",
@@ -50,6 +60,53 @@ fun CuartelDetailScreen(
         radiacionSolar = "-- W/m²",
         humedadRelativa = "-- %"
     )
+
+    // Obtención de coordenadas GPS reales, guardado en SQLite y navegación al Historial
+    @SuppressLint("MissingPermission")
+    fun obtenerUbicacionYRegistrar() {
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val lat = location.latitude
+                val lng = location.longitude
+
+                AgroRepository.registrarVisitaTerreno(cuartelName, lat, lng)
+
+                Toast.makeText(
+                    context,
+                    "Visita registrada en $cuartelName",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                val defaultLat = -33.7251
+                val defaultLng = -70.7320
+                AgroRepository.registrarVisitaTerreno(cuartelName, defaultLat, defaultLng)
+                Toast.makeText(
+                    context,
+                    "Visita registrada (Predio Buin)",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            // Navegar directamente a la pantalla de Historial GPS tras registrar
+            onNavigateToHistorial()
+        }.addOnFailureListener {
+            Toast.makeText(context, "Error al obtener señal GPS", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Gestor de permisos para pedir acceso al GPS en tiempo de ejecución
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            obtenerUbicacionYRegistrar()
+        } else {
+            Toast.makeText(
+                context,
+                "Se requiere permiso GPS para registrar la visita",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -77,10 +134,19 @@ fun CuartelDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Botón de Acción Principal: Registrar Visita GPS
+            // Botón de Acción Principal: GPS
             Button(
                 onClick = {
-                    AgroRepository.registrarVisitaTerreno(cuartelName, -33.7251, -70.7320)
+                    val tienePermiso = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (tienePermiso) {
+                        obtenerUbicacionYRegistrar()
+                    } else {
+                        locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -110,7 +176,7 @@ fun CuartelDetailScreen(
                 )
             )
 
-            // 2. Grilla de Tarjetas de Sensores DINÁMICAS (Conectadas a cuartelInfo)
+            // Grilla de Tarjetas de Sensores
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -162,10 +228,10 @@ fun CuartelDetailScreen(
                     value = cuartelInfo.humedadRelativa,
                     modifier = Modifier.weight(1f)
                 )
-                Spacer(modifier = Modifier.weight(1f)) // Espacio para mantener el equilibrio visual
+                Spacer(modifier = Modifier.weight(1f))
             }
 
-            // 3. Botón para acceder al estado de los Actuadores
+            // Acceso a Actuadores
             OutlinedButton(
                 onClick = onNavigateToActuadores,
                 modifier = Modifier

@@ -60,12 +60,19 @@ class MainActivity : ComponentActivity() {
                         CuartelDetailScreen(
                             cuartelName = selectedCuartel,
                             onBackClick = { currentScreen = "home" },
-                            onNavigateToActuadores = { currentScreen = "actuadores" }
+                            onNavigateToActuadores = { currentScreen = "actuadores" },
+                            onNavigateToHistorial = { currentScreen = "historial" }
                         )
                     }
                     "actuadores" -> {
                         ActuadoresScreen(
                             cuartelName = selectedCuartel,
+                            onBackClick = { currentScreen = "detail" }
+                        )
+                    }
+                    "historial" -> {
+                        VisitasHistorialScreen(
+                            cuartelFilter = selectedCuartel,
                             onBackClick = { currentScreen = "detail" }
                         )
                     }

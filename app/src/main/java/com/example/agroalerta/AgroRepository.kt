@@ -12,93 +12,122 @@ import java.util.Date
 import java.util.Locale
 import kotlin.random.Random
 
+// Modelo de estado para Actuadores (Bombas y Válvulas)
+data class ActuadorState(
+    val cuartelId: String,
+    val bombaEncendida: Boolean = false,
+    val valvulaAbierta: Boolean = false
+)
+
 object AgroRepository {
 
-    private var dbHelper: AgroDatabaseHelper? = null
     private val scope = CoroutineScope(Dispatchers.IO)
+    private var dbHelper: AgroDatabaseHelper? = null
 
-    // Telemetría de los 4 Cuarteles
-    private val _telemetriaMap = MutableStateFlow(
-        mapOf(
-            "Cuartel 1" to TelemetriaCuartel("Cuartel 1", "19.2 °C", "64 %", "42 L/min", "620 W/m²", "55 %", estadoGlobal = "Estado OK", tieneRiesgo = false),
-            "Cuartel 2" to TelemetriaCuartel("Cuartel 2", "18.5 °C", "68 %", "45 L/min", "610 W/m²", "58 %", estadoGlobal = "Estado OK", tieneRiesgo = false),
-            "Cuartel 3" to TelemetriaCuartel("Cuartel 3", "-1.5 °C", "40 %", "0 L/min", "120 W/m²", "85 %", estadoGlobal = "Riesgo Helada", tieneRiesgo = true),
-            "Cuartel 4" to TelemetriaCuartel("Cuartel 4", "28.4 °C", "22 %", "10 L/min", "890 W/m²", "30 %", estadoGlobal = "Falta de Riego", tieneRiesgo = true)
-        )
-    )
+    // Estados reactivos (StateFlow)
+    private val _telemetriaMap = MutableStateFlow<Map<String, TelemetriaCuartel>>(emptyMap())
     val telemetriaMap: StateFlow<Map<String, TelemetriaCuartel>> = _telemetriaMap.asStateFlow()
 
-    // Estado de actuadores independiente
-    private val _actuadoresMap = MutableStateFlow(
-        mapOf(
-            "Cuartel 1" to EstadoActuadores(cuartelId = "Cuartel 1", bombaEncendida = true, valvulaAbierta = true, antiHeladasActivo = false),
-            "Cuartel 2" to EstadoActuadores(cuartelId = "Cuartel 2", bombaEncendida = true, valvulaAbierta = true, antiHeladasActivo = false),
-            "Cuartel 3" to EstadoActuadores(cuartelId = "Cuartel 3", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-            "Cuartel 4" to EstadoActuadores(cuartelId = "Cuartel 4", bombaEncendida = false, valvulaAbierta = true, antiHeladasActivo = false)
-        )
-    )
-    val actuadoresMap: StateFlow<Map<String, EstadoActuadores>> = _actuadoresMap.asStateFlow()
-
-    private val _alertasActivas = MutableStateFlow(
-        listOf(
-            AlertaItem(1, "Riesgo de Helada Crítica", "Cuartel 3", esCritica = true, fechaHora = "16/10 05:15"),
-            AlertaItem(2, "Baja Humedad Crítica en Suelo", "Cuartel 4", esCritica = true, fechaHora = "16/10 08:30"),
-            AlertaItem(3, "Bajo Nivel de Estanque", "Predio General", esCritica = false, fechaHora = "16/10 10:00")
-        )
-    )
-    val alertasActivas: StateFlow<List<AlertaItem>> = _alertasActivas.asStateFlow()
+    private val _actuadoresMap = MutableStateFlow<Map<String, ActuadorState>>(emptyMap())
+    val actuadoresMap: StateFlow<Map<String, ActuadorState>> = _actuadoresMap.asStateFlow()
 
     private val _visitasGps = MutableStateFlow<List<VisitaGps>>(emptyList())
     val visitasGps: StateFlow<List<VisitaGps>> = _visitasGps.asStateFlow()
 
-    // Inicializar SQLite
-    fun init(context: Context) {
-        if (dbHelper != null) return
-        dbHelper = AgroDatabaseHelper(context.applicationContext)
+    // Indicador de Conectividad (Online vs Offline)
+    private val _isOffline = MutableStateFlow(false)
+    val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
 
-        // Cargar datos persistidos desde SQLite
-        scope.launch {
-            val guardados = dbHelper?.obtenerTodosLosActuadores() ?: emptyMap()
-            if (guardados.isNotEmpty()) {
-                val mapaActualizado = _actuadoresMap.value.toMutableMap()
-                mapaActualizado.putAll(guardados)
-                _actuadoresMap.value = mapaActualizado
+    fun init(context: Context) {
+        if (dbHelper == null) {
+            dbHelper = AgroDatabaseHelper(context)
+
+            // Cargar visitas guardadas en SQLite
+            scope.launch {
+                val guardadas = dbHelper?.obtenerVisitas() ?: emptyList()
+                _visitasGps.value = guardadas
             }
 
-            val visitasGuardadas = dbHelper?.obtenerVisitas() ?: emptyList()
-            _visitasGps.value = visitasGuardadas
+            // Inicializar estado por defecto de actuadores
+            _actuadoresMap.value = mapOf(
+                "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = true, valvulaAbierta = true),
+                "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false),
+                "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = true, valvulaAbierta = true),
+                "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false)
+            )
+
+            // Primera sincronización al arrancar
+            sincronizarTelemetria()
         }
     }
 
-    fun actualizarBomba(cuartelId: String, encendida: Boolean) {
-        val estadoNuevo = (_actuadoresMap.value[cuartelId] ?: EstadoActuadores(cuartelId = cuartelId)).copy(bombaEncendida = encendida)
-        guardarActuador(estadoNuevo)
-    }
-
-    fun actualizarValvula(cuartelId: String, abierta: Boolean) {
-        val estadoNuevo = (_actuadoresMap.value[cuartelId] ?: EstadoActuadores(cuartelId = cuartelId)).copy(valvulaAbierta = abierta)
-        guardarActuador(estadoNuevo)
-    }
-
-    fun actualizarAntiHeladas(cuartelId: String, activo: Boolean) {
-        val estadoNuevo = (_actuadoresMap.value[cuartelId] ?: EstadoActuadores(cuartelId = cuartelId)).copy(antiHeladasActivo = activo)
-        guardarActuador(estadoNuevo)
-    }
-
-    private fun guardarActuador(estado: EstadoActuadores) {
-        val mapaActual = _actuadoresMap.value.toMutableMap()
-        mapaActual[estado.cuartelId] = estado
-        _actuadoresMap.value = mapaActual
-
+    // Lógica de Sincronización Online/Offline
+    fun sincronizarTelemetria(simularErrorRed: Boolean = false) {
         scope.launch {
-            dbHelper?.guardarOActualizarActuador(estado)
+            try {
+                if (simularErrorRed) {
+                    throw Exception("Error de red simulado para probar Modo Offline")
+                }
+
+                // 1. SIMULACIÓN / PETICIÓN REST (Genera datos dinámicos con fluctuación aleatoria)
+                val nuevosDatos = generarTelemetriaDinamica()
+
+                // 2. Guardar inmediatamente en Caché Local SQLite
+                dbHelper?.guardarTelemetriaLocal(nuevosDatos)
+
+                // 3. Actualizar la UI y marcar como ONLINE
+                _telemetriaMap.value = nuevosDatos.associateBy { it.cuartelId }
+                _isOffline.value = false
+
+            } catch (e: Exception) {
+                // 4. Si la red falla (MODO OFFLINE), cargar desde SQLite
+                val datosOffline = dbHelper?.obtenerTelemetriaLocal() ?: emptyList()
+
+                if (datosOffline.isNotEmpty()) {
+                    _telemetriaMap.value = datosOffline.associateBy { it.cuartelId }
+                }
+                _isOffline.value = true
+            }
         }
     }
 
-    fun descartarAlerta(id: Int) {
-        _alertasActivas.value = _alertasActivas.value.filterNot { it.id == id }
+    // Genera mediciones con pequeñas variaciones aleatorias para simular el servidor REST
+    private fun generarTelemetriaDinamica(): List<TelemetriaCuartel> {
+        val nombresCuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4")
+        return nombresCuarteles.map { nombre ->
+            val tempVal = Random.nextDouble(14.0, 26.0)
+            val humSueloVal = Random.nextInt(40, 85)
+            val caudalVal = Random.nextInt(20, 60)
+            val radVal = Random.nextInt(400, 800)
+            val humRelVal = Random.nextInt(50, 90)
+
+            val tieneRiesgo = tempVal < 2.0 || humSueloVal < 45
+            val estadoGlobal = when {
+                tempVal < 2.0 -> "Riesgo Helada"
+                humSueloVal < 45 -> "Falta de Riego"
+                else -> "Estado OK"
+            }
+
+            TelemetriaCuartel(
+                cuartelId = nombre,
+                temperatura = String.format(Locale.US, "%.1f °C", tempVal),
+                humedadSuelo = "$humSueloVal %",
+                caudal = "$caudalVal L/min",
+                radiacionSolar = "$radVal W/m²",
+                humedadRelativa = "$humRelVal %",
+                tieneRiesgo = tieneRiesgo,
+                estadoGlobal = estadoGlobal
+            )
+        }
     }
 
+    // Desactivar la generación automática al cambiar de vista
+    fun actualizarLecturasAleatorias(cuartelId: String) {
+        // Se deja vacío intencionalmente para preservar la estabilidad de los datos
+        // durante la navegación entre pantallas.
+    }
+
+    // Registro GPS en SQLite
     fun registrarVisitaTerreno(cuartel: String, lat: Double, lng: Double) {
         val formato = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         val fecha = formato.format(Date())
@@ -110,72 +139,18 @@ object AgroRepository {
         }
     }
 
-    // Modificar la telemetría de un cuartel específico en tiempo real
-    fun actualizarTelemetriaCuartel(
-        cuartelId: String,
-        nuevaTemp: String,
-        nuevaHumedad: String,
-        nuevoEstado: String,
-        tieneRiesgo: Boolean
-    ) {
-        val mapaActual = _telemetriaMap.value.toMutableMap()
-        val cuartelActual = mapaActual[cuartelId]
-
-        if (cuartelActual != null) {
-            mapaActual[cuartelId] = cuartelActual.copy(
-                temperatura = nuevaTemp,
-                humedadSuelo = nuevaHumedad,
-                estadoGlobal = nuevoEstado,
-                tieneRiesgo = tieneRiesgo
-            )
-            _telemetriaMap.value = mapaActual
-        }
+    // Conmutadores de Actuadores
+    fun toggleBomba(cuartelId: String) {
+        val actual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoMap = _actuadoresMap.value.toMutableMap()
+        nuevoMap[cuartelId] = actual.copy(bombaEncendida = !actual.bombaEncendida)
+        _actuadoresMap.value = nuevoMap
     }
 
-    // Simular un evento de helada crítica en un cuartel especificado
-    fun simularHelada(cuartelId: String) {
-        actualizarTelemetriaCuartel(
-            cuartelId = cuartelId,
-            nuevaTemp = "-2.1 °C",
-            nuevaHumedad = "38 %",
-            nuevoEstado = "Riesgo Helada",
-            tieneRiesgo = true
-        )
+    fun toggleValvula(cuartelId: String) {
+        val actual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoMap = _actuadoresMap.value.toMutableMap()
+        nuevoMap[cuartelId] = actual.copy(valvulaAbierta = !actual.valvulaAbierta)
+        _actuadoresMap.value = nuevoMap
     }
-
-    // Restaurar un cuartel a condiciones óptimas
-    fun restaurarEstadoNormal(cuartelId: String) {
-        actualizarTelemetriaCuartel(
-            cuartelId = cuartelId,
-            nuevaTemp = "19.5 °C",
-            nuevaHumedad = "65 %",
-            nuevoEstado = "Estado OK",
-            tieneRiesgo = false
-        )
-    }
-
-
-    // Genera lecturas fluctuantes en rangos realistas para un cuartel
-    fun actualizarLecturasAleatorias(cuartelId: String) {
-        val mapaActual = _telemetriaMap.value.toMutableMap()
-        val cuartelActual = mapaActual[cuartelId] ?: return
-
-        // Generar variaciones dentro de rangos agrícolas coherentes
-        val tempRandom = String.format(Locale.US, "%.1f °C", Random.nextDouble(16.0, 26.0))
-        val humSueloRandom = "${Random.nextInt(50, 85)} %"
-        val caudalRandom = "${Random.nextInt(35, 55)} L/min"
-        val radRandom = "${Random.nextInt(500, 850)} W/m²"
-        val humAmbRandom = "${Random.nextInt(45, 70)} %"
-
-        mapaActual[cuartelId] = cuartelActual.copy(
-            temperatura = tempRandom,
-            humedadSuelo = humSueloRandom,
-            caudal = caudalRandom,                     // Corregido: 'caudal' en lugar de 'caudalRiego'
-            radiacionSolar = radRandom,
-            humedadRelativa = humAmbRandom             // Corregido: 'humedadRelativa' en lugar de 'humedadAmbiente'
-        )
-
-        _telemetriaMap.value = mapaActual
-    }
-
 }
