@@ -3,17 +3,21 @@ package com.example.agroalerta.ui.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Eco
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,16 +32,58 @@ fun AlertsScreen(
     viewModel: AgroViewModel = viewModel()
 ) {
     val alertasActivas by viewModel.alertasActivas.collectAsState()
-    var selectedTab by remember { mutableStateOf(0) } // 0: Activas, 1: Historial
+    val historialAlertas by viewModel.historialAlertas.collectAsState()
+
+    var selectedTab by remember { mutableStateOf(0) } // 0: Alertas Activas, 1: Historial de Eventos
+
+    // Filtros para la vista de Alertas Activas (Chips)
+    var filtroTipoSelected by remember { mutableStateOf("Todas") }
+
+    // Filtros para la vista de Historial (Dropdowns según captura)
+    var fechaSelected by remember { mutableStateOf("Hoy") }
+    var tipoEventoSelected by remember { mutableStateOf("Todos") }
+
+    var expandedFecha by remember { mutableStateOf(false) }
+    var expandedTipo by remember { mutableStateOf(false) }
+
+    // Filtrado dinámico según la pestaña activa
+    val listaAlertasFiltradas = remember(
+        alertasActivas, historialAlertas, selectedTab, filtroTipoSelected, fechaSelected, tipoEventoSelected
+    ) {
+        if (selectedTab == 0) {
+            when (filtroTipoSelected) {
+                "Heladas" -> alertasActivas.filter { it.titulo.contains("Helada", ignoreCase = true) }
+                "Riego / Humedad" -> alertasActivas.filter {
+                    it.titulo.contains("Humedad", ignoreCase = true) || it.titulo.contains("Riego", ignoreCase = true)
+                }
+                "Estanque / General" -> alertasActivas.filter {
+                    it.titulo.contains("Estanque", ignoreCase = true) || it.cuartel.contains("Predio", ignoreCase = true)
+                }
+                else -> alertasActivas
+            }
+        } else {
+            when (tipoEventoSelected) {
+                "Heladas" -> historialAlertas.filter { it.titulo.contains("Helada", ignoreCase = true) }
+                "Riego / Humedad" -> historialAlertas.filter {
+                    it.titulo.contains("Humedad", ignoreCase = true) || it.titulo.contains("Riego", ignoreCase = true)
+                }
+                "Estanque / General" -> historialAlertas.filter {
+                    it.titulo.contains("Estanque", ignoreCase = true) || it.cuartel.contains("Predio", ignoreCase = true)
+                }
+                else -> historialAlertas
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        text = "Centro de Alertas",
+                        text = if (selectedTab == 0) "Alertas Activas" else "Historial",
                         fontWeight = FontWeight.Bold,
-                        color = AgroGreenPrimary
+                        color = AgroGreenPrimary,
+                        fontSize = 24.sp
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AgroBackground)
@@ -49,82 +95,238 @@ fun AlertsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(AgroBackground)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Pestañas (Tabs) trabajadas por tu compañero
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color.White,
-                contentColor = AgroGreenPrimary
+            // 1. Selector de Pestañas Estilizado
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFEFF4F0)
             ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Alertas Activas (${alertasActivas.size})", fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Notifications, contentDescription = "Activas") }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Historial", fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.History, contentDescription = "Historial") }
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(4.dp)
+                ) {
+                    Button(
+                        onClick = { selectedTab = 0 },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 0) AgroGreenPrimary else Color.Transparent,
+                            contentColor = if (selectedTab == 0) Color.White else AgroGreenPrimary
+                        ),
+                        elevation = null
+                    ) {
+                        Text(
+                            text = "Alertas Activas (${alertasActivas.size})",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Button(
+                        onClick = { selectedTab = 1 },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 1) AgroGreenPrimary else Color.Transparent,
+                            contentColor = if (selectedTab == 1) Color.White else AgroGreenPrimary
+                        ),
+                        elevation = null
+                    ) {
+                        Text(
+                            text = "Historial de Eventos",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp)
-            ) {
-                if (selectedTab == 0) {
-                    // Vista 1: Alertas Activas
-                    if (alertasActivas.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // 2. Filtros según la pestaña seleccionada
+            if (selectedTab == 0) {
+                // Filtro por Chips para Alertas Activas
+                val tiposFiltro = listOf("Todas", "Heladas", "Riego / Humedad", "Estanque / General")
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
+                ) {
+                    items(tiposFiltro) { tipo ->
+                        FilterChip(
+                            selected = filtroTipoSelected == tipo,
+                            onClick = { filtroTipoSelected = tipo },
+                            label = { Text(tipo, fontSize = 12.sp, fontWeight = FontWeight.Medium) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AgroGreenPrimary,
+                                selectedLabelColor = Color.White,
+                                containerColor = Color.White,
+                                labelColor = AgroTextDark
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = filtroTipoSelected == tipo,
+                                borderColor = if (filtroTipoSelected == tipo) AgroGreenPrimary else Color(0xFFE0E0E0)
+                            ),
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                    }
+                }
+            } else {
+                // Filtros con Tarjeta Dropdown (Exactos a la captura de pantalla del Historial)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Dropdown 1: Fecha
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "Sin alertas",
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = null,
                                     tint = AgroGreenPrimary,
-                                    modifier = Modifier.size(48.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "No hay alertas activas en el predio.",
-                                    color = AgroTextMuted,
-                                    fontSize = 14.sp
-                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Fecha", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AgroGreenPrimary)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Box {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFFF2F6F3),
+                                    onClick = { expandedFecha = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(fechaSelected, fontSize = 13.sp, color = AgroTextDark)
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AgroGreenPrimary)
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = expandedFecha,
+                                    onDismissRequest = { expandedFecha = false }
+                                ) {
+                                    listOf("Hoy", "Ayer", "Última semana", "Todas").forEach { opcion ->
+                                        DropdownMenuItem(
+                                            text = { Text(opcion) },
+                                            onClick = {
+                                                fechaSelected = opcion
+                                                expandedFecha = false
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
-                    } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(alertasActivas) { alerta ->
-                                AlertaCardItem(alerta = alerta, esHistorial = false)
+
+                        // Dropdown 2: Tipo de evento
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Eco,
+                                    contentDescription = null,
+                                    tint = AgroGreenPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Tipo de evento", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AgroGreenPrimary)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Box {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFFF2F6F3),
+                                    onClick = { expandedTipo = true }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(tipoEventoSelected, fontSize = 13.sp, color = AgroTextDark)
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AgroGreenPrimary)
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = expandedTipo,
+                                    onDismissRequest = { expandedTipo = false }
+                                ) {
+                                    listOf("Todos", "Heladas", "Riego / Humedad", "Estanque / General").forEach { opcion ->
+                                        DropdownMenuItem(
+                                            text = { Text(opcion) },
+                                            onClick = {
+                                                tipoEventoSelected = opcion
+                                                expandedTipo = false
+                                            }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
-                } else {
-                    // Vista 2: Historial de Alertas Atendidas / Pasadas
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                }
+            }
+
+            // 3. Contenido Principal
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 4.dp)
+            ) {
+                if (listaAlertasFiltradas.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        item {
-                            Text(
-                                text = "Registro de Eventos Pasados",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AgroTextMuted,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                        }
-                        // Muestra las alertas registradas como historial
-                        items(alertasActivas) { alerta ->
-                            AlertaCardItem(alerta = alerta, esHistorial = true)
+                        Text(
+                            text = if (selectedTab == 0) "No hay alertas activas." else "No hay eventos registrados en el historial.",
+                            color = AgroTextMuted,
+                            fontSize = 14.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        items(listaAlertasFiltradas.size) { index ->
+                            val alerta = listaAlertasFiltradas[index]
+                            if (selectedTab == 0) {
+                                TarjetaAlertaActiva(
+                                    alerta = alerta,
+                                    onMarcarComoVista = { viewModel.marcarAlertaComoVista(alerta) }
+                                )
+                            } else {
+                                TarjetaHistorialTimeline(
+                                    alerta = alerta,
+                                    isLastItem = index == listaAlertasFiltradas.size - 1
+                                )
+                            }
                         }
                     }
                 }
@@ -133,53 +335,176 @@ fun AlertsScreen(
     }
 }
 
+// Vista 1: Tarjeta para Alertas Activas
 @Composable
-fun AlertaCardItem(alerta: AlertaItem, esHistorial: Boolean) {
+fun TarjetaAlertaActiva(
+    alerta: AlertaItem,
+    onMarcarComoVista: () -> Unit
+) {
+    val isCritica = alerta.esCritica
+    val cardBgColor = if (isCritica) Color(0xFFFFF0F0) else Color(0xFFF2F7F3)
+    val buttonBgColor = if (isCritica) Color(0xFFD9383A) else AgroGreenPrimary
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (esHistorial) Color(0xFFF9F9F9) else Color.White
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (esHistorial) 0.dp else 2.dp)
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (esHistorial) Icons.Default.CheckCircle else Icons.Default.Warning,
-                contentDescription = "Estado Alerta",
-                tint = if (esHistorial) AgroTextMuted else if (alerta.esCritica) Color(0xFFD9383A) else Color(0xFFFF9800),
-                modifier = Modifier.size(36.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = alerta.cuartel,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = AgroTextDark
-                    )
-                    Text(
-                        text = alerta.fechaHora,
-                        fontSize = 12.sp,
-                        color = AgroTextMuted
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Tipo de alerta",
+                    fontSize = 11.sp,
+                    color = if (isCritica) Color(0xFFD9383A) else AgroTextMuted,
+                    fontWeight = FontWeight.Medium
+                )
                 Text(
                     text = alerta.titulo,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = if (esHistorial) AgroTextMuted else if (alerta.esCritica) Color(0xFFD9383A) else Color(0xFFFF9800)
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AgroGreenPrimary
                 )
+                Text(
+                    text = "Cuartel: ${alerta.cuartel}",
+                    fontSize = 12.sp,
+                    color = AgroTextMuted
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Button(
+                onClick = onMarcarComoVista,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = buttonBgColor),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Marcar como vista",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+    }
+}
+
+// Vista 2: Tarjeta con Línea de Tiempo para Historial de Eventos (Diseño exacto de la captura)
+@Composable
+fun TarjetaHistorialTimeline(
+    alerta: AlertaItem,
+    isLastItem: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Indicador de Línea de Tiempo (Timeline)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.width(32.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(AgroGreenPrimary)
+            )
+            if (!isLastItem) {
+                Box(
+                    modifier = Modifier
+                        .width(2.dp)
+                        .height(64.dp)
+                        .background(Color(0xFFC8E6C9))
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Tarjeta principal del evento del historial
+        Card(
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Icono circular según tipo de evento
+                    val isHelada = alerta.titulo.contains("Helada", ignoreCase = true)
+                    val iconBgColor = if (isHelada) Color(0xFFFFF0F0) else Color(0xFFE8F5E9)
+                    val iconTint = if (isHelada) Color(0xFFD9383A) else AgroGreenPrimary
+
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(iconBgColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isHelada) Icons.Default.Warning else Icons.Default.WaterDrop,
+                            contentDescription = null,
+                            tint = iconTint,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = "[${alerta.fechaHora}] - ${alerta.titulo}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AgroGreenPrimary
+                        )
+                        if (alerta.cuartel.isNotEmpty()) {
+                            Text(
+                                text = "Cuartel: ${alerta.cuartel}",
+                                fontSize = 11.sp,
+                                color = AgroTextMuted
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // Estado (Atendida. / Resuelto.)
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFEDF4EE)
+                ) {
+                    Text(
+                        text = if (alerta.esCritica) "Atendida." else "Resuelto.",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AgroGreenPrimary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
             }
         }
     }

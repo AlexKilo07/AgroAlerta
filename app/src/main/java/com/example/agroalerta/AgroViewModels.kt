@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -24,18 +24,53 @@ class AgroViewModel : ViewModel() {
     // 4. Indicador de conectividad Online/Offline
     val isOffline: StateFlow<Boolean> = AgroRepository.isOffline
 
-    // 5. Transformar la telemetría en una lista de alertas activas dinámicas
-    val alertasActivas: StateFlow<List<AlertaItem>> = telemetriaMap.map { mapa ->
+    // 5. Alertas Activas (Pendientes de revisar)
+    val alertasActivas: StateFlow<List<AlertaItem>> = combine(
+        telemetriaMap,
+        AgroRepository.alertasAtendidas
+    ) { mapa, atendidas ->
         val formatoHora = SimpleDateFormat("HH:mm", Locale.getDefault())
         val horaActual = formatoHora.format(Date())
 
-        mapa.values.filter { it.tieneRiesgo }.mapIndexed { index, telemetria ->
+        mapa.values.filter { it.tieneRiesgo }.mapIndexedNotNull { index, telemetria ->
+            val clave = "${telemetria.cuartelId}|${telemetria.estadoGlobal}"
+            if (!atendidas.contains(clave)) {
+                AlertaItem(
+                    id = index + 1,
+                    cuartel = telemetria.cuartelId,
+                    titulo = telemetria.estadoGlobal,
+                    fechaHora = horaActual,
+                    esCritica = telemetria.estadoGlobal.contains("Helada") || telemetria.estadoGlobal.contains("Crítica")
+                )
+            } else {
+                null
+            }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // 6. Historial de Alertas Atendidas (Persistente)
+    val historialAlertas: StateFlow<List<AlertaItem>> = combine(
+        telemetriaMap,
+        AgroRepository.alertasAtendidas
+    ) { mapa, atendidas ->
+        val formatoHora = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val horaActual = formatoHora.format(Date())
+
+        atendidas.mapIndexed { index, clave ->
+            val partes = clave.split("|")
+            val cuartel = partes.getOrElse(0) { "Predio" }
+            val titulo = partes.getOrElse(1) { "Evento Atendido" }
+
             AlertaItem(
-                id = index + 1,
-                cuartel = telemetria.cuartelId,
-                titulo = telemetria.estadoGlobal,
+                id = 100 + index,
+                cuartel = cuartel,
+                titulo = titulo,
                 fechaHora = horaActual,
-                esCritica = telemetria.estadoGlobal == "Riesgo Helada"
+                esCritica = titulo.contains("Helada") || titulo.contains("Crítica")
             )
         }
     }.stateIn(
@@ -43,6 +78,11 @@ class AgroViewModel : ViewModel() {
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    // Marcar como vista
+    fun marcarAlertaComoVista(alerta: AlertaItem) {
+        AgroRepository.marcarAlertaAtendida(alerta.cuartel, alerta.titulo)
+    }
 
     // Métodos para controlar actuadores
     fun actualizarBomba(cuartelId: String) {
@@ -57,17 +97,28 @@ class AgroViewModel : ViewModel() {
         AgroRepository.toggleBomba(cuartelId)
     }
 
-    // Método para forzar la sincronización de datos
     fun refrescarTelemetria() {
         AgroRepository.sincronizarTelemetria()
     }
 
-    // Métodos para simulaciones de riesgo desde Ajustes
-    fun simularHelada() {
-        AgroRepository.sincronizarTelemetria(simularErrorRed = false)
+    // Simulaciones de prueba individuales
+    fun simularHeladaCuartel(cuartelId: String) {
+        AgroRepository.simularHeladaCuartel(cuartelId)
+    }
+
+    fun simularBajaHumedadCuartel(cuartelId: String) {
+        AgroRepository.simularBajaHumedadCuartel(cuartelId)
+    }
+
+    fun simularBajoEstanqueCuartel(cuartelId: String) {
+        AgroRepository.simularBajoEstanqueCuartel(cuartelId)
+    }
+
+    fun restablecerCuartel(cuartelId: String) {
+        AgroRepository.restablecerCuartel(cuartelId)
     }
 
     fun restaurarEstadoNormal() {
-        AgroRepository.sincronizarTelemetria(simularErrorRed = false)
+        AgroRepository.restaurarAlertas()
     }
 }

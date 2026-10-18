@@ -34,6 +34,10 @@ object AgroRepository {
     private val _visitasGps = MutableStateFlow<List<VisitaGps>>(emptyList())
     val visitasGps: StateFlow<List<VisitaGps>> = _visitasGps.asStateFlow()
 
+    // Persistencia de Alertas Atendidas (Clave: "Cuartel|Titulo")
+    private val _alertasAtendidas = MutableStateFlow<Set<String>>(emptySet())
+    val alertasAtendidas: StateFlow<Set<String>> = _alertasAtendidas.asStateFlow()
+
     // Indicador de Conectividad (Online vs Offline)
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
@@ -42,10 +46,13 @@ object AgroRepository {
         if (dbHelper == null) {
             dbHelper = AgroDatabaseHelper(context)
 
-            // Cargar visitas guardadas en SQLite
+            // Cargar visitas y alertas atendidas desde SQLite
             scope.launch {
                 val guardadas = dbHelper?.obtenerVisitas() ?: emptyList()
                 _visitasGps.value = guardadas
+
+                val atendidas = dbHelper?.obtenerAlertasAtendidas() ?: emptySet()
+                _alertasAtendidas.value = atendidas
             }
 
             // Inicializar estado por defecto de actuadores
@@ -69,7 +76,7 @@ object AgroRepository {
                     throw Exception("Error de red simulado para probar Modo Offline")
                 }
 
-                // 1. SIMULACIÓN / PETICIÓN REST (Genera datos dinámicos con fluctuación aleatoria)
+                // 1. SIMULACIÓN / PETICIÓN REST (Genera datos dinámicos)
                 val nuevosDatos = generarTelemetriaDinamica()
 
                 // 2. Guardar inmediatamente en Caché Local SQLite
@@ -91,9 +98,9 @@ object AgroRepository {
         }
     }
 
-    // Genera mediciones con pequeñas variaciones aleatorias para simular el servidor REST
+    // Genera mediciones aleatorias garantizando los 3 tipos de alerta para pruebas
     private fun generarTelemetriaDinamica(): List<TelemetriaCuartel> {
-        val nombresCuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4")
+        val nombresCuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4", "Predio General")
         return nombresCuarteles.map { nombre ->
             val tempVal = Random.nextDouble(14.0, 26.0)
             val humSueloVal = Random.nextInt(40, 85)
@@ -101,11 +108,22 @@ object AgroRepository {
             val radVal = Random.nextInt(400, 800)
             val humRelVal = Random.nextInt(50, 90)
 
-            val tieneRiesgo = tempVal < 2.0 || humSueloVal < 45
-            val estadoGlobal = when {
-                tempVal < 2.0 -> "Riesgo Helada"
-                humSueloVal < 45 -> "Falta de Riego"
-                else -> "Estado OK"
+            val tieneRiesgo = when (nombre) {
+                "Cuartel 3" -> true // Alerta Tipo Helada
+                "Cuartel 4" -> true // Alerta Tipo Humedad
+                "Predio General" -> true // Alerta Tipo Estanque
+                else -> tempVal < 2.0 || humSueloVal < 45
+            }
+
+            val estadoGlobal = when (nombre) {
+                "Cuartel 3" -> "Riesgo de Helada Crítica"
+                "Cuartel 4" -> "Baja Humedad Crítica en Suelo"
+                "Predio General" -> "Bajo Nivel de Estanque"
+                else -> when {
+                    tempVal < 2.0 -> "Riesgo de Helada Crítica"
+                    humSueloVal < 45 -> "Baja Humedad Crítica en Suelo"
+                    else -> "Estado OK"
+                }
             }
 
             TelemetriaCuartel(
@@ -121,11 +139,88 @@ object AgroRepository {
         }
     }
 
-    // Desactivar la generación automática al cambiar de vista
-    fun actualizarLecturasAleatorias(cuartelId: String) {
-        // Se deja vacío intencionalmente para preservar la estabilidad de los datos
-        // durante la navegación entre pantallas.
+    // --- Simulaciones Individuales por Cuartel desde Ajustes ---
+    fun simularHeladaCuartel(cuartelId: String) {
+        val mapaActual = _telemetriaMap.value.toMutableMap()
+        val actual = mapaActual[cuartelId] ?: TelemetriaCuartel(
+            cuartelId = cuartelId,
+            temperatura = "18.0 °C",
+            humedadSuelo = "60 %",
+            caudal = "40 L/min",
+            radiacionSolar = "600 W/m²",
+            humedadRelativa = "50 %"
+        )
+
+        mapaActual[cuartelId] = actual.copy(
+            temperatura = "-1.8 °C",
+            humedadRelativa = "88 %",
+            tieneRiesgo = true,
+            estadoGlobal = "Riesgo de Helada Crítica"
+        )
+        _telemetriaMap.value = mapaActual
     }
+
+    fun simularBajaHumedadCuartel(cuartelId: String) {
+        val mapaActual = _telemetriaMap.value.toMutableMap()
+        val actual = mapaActual[cuartelId] ?: TelemetriaCuartel(
+            cuartelId = cuartelId,
+            temperatura = "24.0 °C",
+            humedadSuelo = "60 %",
+            caudal = "40 L/min",
+            radiacionSolar = "700 W/m²",
+            humedadRelativa = "40 %"
+        )
+
+        mapaActual[cuartelId] = actual.copy(
+            humedadSuelo = "18 %",
+            caudal = "5 L/min",
+            tieneRiesgo = true,
+            estadoGlobal = "Baja Humedad Crítica en Suelo"
+        )
+        _telemetriaMap.value = mapaActual
+    }
+
+    fun simularBajoEstanqueCuartel(cuartelId: String) {
+        val mapaActual = _telemetriaMap.value.toMutableMap()
+        val actual = mapaActual[cuartelId] ?: TelemetriaCuartel(
+            cuartelId = cuartelId,
+            temperatura = "20.0 °C",
+            humedadSuelo = "55 %",
+            caudal = "40 L/min",
+            radiacionSolar = "650 W/m²",
+            humedadRelativa = "50 %"
+        )
+
+        mapaActual[cuartelId] = actual.copy(
+            caudal = "0 L/min",
+            tieneRiesgo = true,
+            estadoGlobal = "Bajo Nivel de Estanque"
+        )
+        _telemetriaMap.value = mapaActual
+    }
+
+    fun restablecerCuartel(cuartelId: String) {
+        val mapaActual = _telemetriaMap.value.toMutableMap()
+        val actual = mapaActual[cuartelId] ?: TelemetriaCuartel(
+            cuartelId = cuartelId,
+            temperatura = "19.5 °C",
+            humedadSuelo = "65 %",
+            caudal = "45 L/min",
+            radiacionSolar = "650 W/m²",
+            humedadRelativa = "55 %"
+        )
+
+        mapaActual[cuartelId] = actual.copy(
+            temperatura = "19.5 °C",
+            humedadSuelo = "65 %",
+            caudal = "45 L/min",
+            tieneRiesgo = false,
+            estadoGlobal = "Estado OK"
+        )
+        _telemetriaMap.value = mapaActual
+    }
+
+    fun actualizarLecturasAleatorias(cuartelId: String) {}
 
     // Registro GPS en SQLite
     fun registrarVisitaTerreno(cuartel: String, lat: Double, lng: Double) {
@@ -136,6 +231,24 @@ object AgroRepository {
             dbHelper?.insertarVisita(cuartel, lat, lng, fecha)
             val actualizadas = dbHelper?.obtenerVisitas() ?: emptyList()
             _visitasGps.value = actualizadas
+        }
+    }
+
+    // Marcar Alerta como Vista con Persistencia en SQLite
+    fun marcarAlertaAtendida(cuartel: String, titulo: String) {
+        scope.launch {
+            dbHelper?.marcarAlertaComoVista(titulo, cuartel)
+            val clave = "$cuartel|$titulo"
+            _alertasAtendidas.value = _alertasAtendidas.value + clave
+        }
+    }
+
+    // Restaurar alertas atendidas (para reiniciar el historial desde pruebas)
+    fun restaurarAlertas() {
+        scope.launch {
+            dbHelper?.limpiarAlertasAtendidas()
+            _alertasAtendidas.value = emptySet()
+            sincronizarTelemetria()
         }
     }
 

@@ -9,7 +9,7 @@ class AgroDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
 
     companion object {
         private const val DATABASE_NAME = "agroalerta.db"
-        private const val DATABASE_VERSION = 2 // Incrementar versión por la nueva tabla
+        private const val DATABASE_VERSION = 3
 
         // Tabla Visitas GPS
         private const val TABLE_VISITAS = "visitas_gps"
@@ -28,6 +28,11 @@ class AgroDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         private const val COLUMN_HUM_REL = "humedad_relativa"
         private const val COLUMN_RIESGO = "tiene_riesgo"
         private const val COLUMN_ESTADO = "estado_global"
+
+        // Tabla Alertas Atendidas (Persistencia)
+        private const val TABLE_ALERTAS_ATENDIDAS = "alertas_atendidas"
+        private const val COLUMN_ALERTA_TITULO = "titulo"
+        private const val COLUMN_ALERTA_CUARTEL = "cuartel_id"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
@@ -54,13 +59,23 @@ class AgroDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
             )
         """.trimIndent()
 
+        val createAlertasAtendidasTable = """
+            CREATE TABLE $TABLE_ALERTAS_ATENDIDAS (
+                $COLUMN_ALERTA_TITULO TEXT,
+                $COLUMN_ALERTA_CUARTEL TEXT,
+                PRIMARY KEY ($COLUMN_ALERTA_TITULO, $COLUMN_ALERTA_CUARTEL)
+            )
+        """.trimIndent()
+
         db.execSQL(createVisitasTable)
         db.execSQL(createTelemetriaTable)
+        db.execSQL(createAlertasAtendidasTable)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         db.execSQL("DROP TABLE IF EXISTS $TABLE_VISITAS")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_TELEMETRIA")
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_ALERTAS_ATENDIDAS")
         onCreate(db)
     }
 
@@ -111,7 +126,6 @@ class AgroDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
                     put(COLUMN_RIESGO, if (item.tieneRiesgo) 1 else 0)
                     put(COLUMN_ESTADO, item.estadoGlobal)
                 }
-                // Reemplaza si ya existe el cuartel o inserta nuevo
                 db.insertWithOnConflict(TABLE_TELEMETRIA, null, values, SQLiteDatabase.CONFLICT_REPLACE)
             }
             db.setTransactionSuccessful()
@@ -152,5 +166,35 @@ class AgroDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_
         }
         cursor.close()
         return lista
+    }
+
+    // --- Métodos de Alertas Atendidas (Persistencia) ---
+    fun marcarAlertaComoVista(titulo: String, cuartel: String) {
+        val db = writableDatabase
+        val values = ContentValues().apply {
+            put(COLUMN_ALERTA_TITULO, titulo)
+            put(COLUMN_ALERTA_CUARTEL, cuartel)
+        }
+        db.insertWithOnConflict(TABLE_ALERTAS_ATENDIDAS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun obtenerAlertasAtendidas(): Set<String> {
+        val set = mutableSetOf<String>()
+        val db = readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM $TABLE_ALERTAS_ATENDIDAS", null)
+        if (cursor.moveToFirst()) {
+            do {
+                val titulo = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ALERTA_TITULO))
+                val cuartel = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_ALERTA_CUARTEL))
+                set.add("$cuartel|$titulo")
+            } while (cursor.moveToNext())
+        }
+        cursor.close()
+        return set
+    }
+
+    fun limpiarAlertasAtendidas() {
+        val db = writableDatabase
+        db.delete(TABLE_ALERTAS_ATENDIDAS, null, null)
     }
 }
