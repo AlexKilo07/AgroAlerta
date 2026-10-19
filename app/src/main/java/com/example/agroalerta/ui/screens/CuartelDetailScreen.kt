@@ -1,4 +1,4 @@
-package com.example.agroalerta
+package com.example.agroalerta.ui.screens
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -32,6 +32,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.agroalerta.data.model.TelemetriaCuartel
+import com.example.agroalerta.data.repository.AgroRepository
 import com.example.agroalerta.ui.theme.*
 import com.google.android.gms.location.LocationServices
 

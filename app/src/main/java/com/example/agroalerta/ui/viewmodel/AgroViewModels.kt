@@ -1,7 +1,12 @@
-package com.example.agroalerta
+package com.example.agroalerta.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.agroalerta.data.model.AlertaItem
+import com.example.agroalerta.data.model.TelemetriaCuartel
+import com.example.agroalerta.data.model.VisitaGps
+import com.example.agroalerta.data.repository.ActuadorState
+import com.example.agroalerta.data.repository.AgroRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -40,7 +45,9 @@ class AgroViewModel : ViewModel() {
                     cuartel = telemetria.cuartelId,
                     titulo = telemetria.estadoGlobal,
                     fechaHora = horaActual,
-                    esCritica = telemetria.estadoGlobal.contains("Helada") || telemetria.estadoGlobal.contains("Crítica")
+                    esCritica = telemetria.estadoGlobal.contains("Helada") || telemetria.estadoGlobal.contains(
+                        "Crítica"
+                    )
                 )
             } else {
                 null

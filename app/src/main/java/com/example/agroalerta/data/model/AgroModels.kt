@@ -1,4 +1,4 @@
-package com.example.agroalerta
+package com.example.agroalerta.data.model
 
 // Telemetría de sensores por cuartel
 data class TelemetriaCuartel(

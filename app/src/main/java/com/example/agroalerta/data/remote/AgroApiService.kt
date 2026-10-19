@@ -1,5 +1,6 @@
-package com.example.agroalerta
+package com.example.agroalerta.data.remote
 
+import com.example.agroalerta.data.model.TelemetriaCuartel
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET

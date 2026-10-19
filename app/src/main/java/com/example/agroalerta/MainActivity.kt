@@ -8,9 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.example.agroalerta.data.repository.AgroRepository
+import com.example.agroalerta.ui.screens.ActuadoresScreen
+import com.example.agroalerta.ui.screens.HomeContent
+import com.example.agroalerta.ui.screens.HomeScreen
 import com.example.agroalerta.ui.theme.AgroAlertaTheme
-import com.example.agroalerta.ui.theme.AlertsScreen
-import com.example.agroalerta.ui.theme.SettingsScreen
+import com.example.agroalerta.ui.screens.AlertsScreen
+import com.example.agroalerta.ui.screens.CuartelDetailScreen
+import com.example.agroalerta.ui.screens.SettingsScreen
+import com.example.agroalerta.ui.screens.VisitasHistorialScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,9 +53,11 @@ class MainActivity : ComponentActivity() {
                                         currentScreen = "detail"
                                     }
                                 )
+
                                 "alerts" -> Box(modifier = Modifier.padding(paddingValues)) {
                                     AlertsScreen()
                                 }
+
                                 "settings" -> Box(modifier = Modifier.padding(paddingValues)) {
                                     SettingsScreen()
                                 }

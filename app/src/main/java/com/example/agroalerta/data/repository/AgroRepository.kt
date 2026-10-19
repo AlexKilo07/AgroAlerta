@@ -1,6 +1,9 @@
-package com.example.agroalerta
+package com.example.agroalerta.data.repository
 
 import android.content.Context
+import com.example.agroalerta.data.local.AgroDatabaseHelper
+import com.example.agroalerta.data.model.TelemetriaCuartel
+import com.example.agroalerta.data.model.VisitaGps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

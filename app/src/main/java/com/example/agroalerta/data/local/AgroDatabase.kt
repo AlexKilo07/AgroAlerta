@@ -1,9 +1,11 @@
-package com.example.agroalerta
+package com.example.agroalerta.data.local
 
 import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.example.agroalerta.data.model.TelemetriaCuartel
+import com.example.agroalerta.data.model.VisitaGps
 
 class AgroDatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 

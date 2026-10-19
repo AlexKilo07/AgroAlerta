@@ -1,4 +1,4 @@
-package com.example.agroalerta.ui.theme
+package com.example.agroalerta.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -23,8 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.agroalerta.AgroViewModel
-import com.example.agroalerta.AlertaItem
+import com.example.agroalerta.ui.viewmodel.AgroViewModel
+import com.example.agroalerta.data.model.AlertaItem
+import com.example.agroalerta.ui.theme.AgroBackground
+import com.example.agroalerta.ui.theme.AgroGreenPrimary
+import com.example.agroalerta.ui.theme.AgroTextDark
+import com.example.agroalerta.ui.theme.AgroTextMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
