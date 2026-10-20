@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.agroalerta.data.repository.AgroRepository
 import com.example.agroalerta.ui.theme.*
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -81,17 +82,15 @@ fun HomeContent(
     paddingValues: PaddingValues,
     onCuartelSelected: (String) -> Unit
 ) {
-    // Escuchar el StateFlow de telemetría, actuadores y visitas GPS desde AgroRepository
     val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
     val actuadoresMap by AgroRepository.actuadoresMap.collectAsState()
     val visitasGps by AgroRepository.visitasGps.collectAsState()
 
-    // Cálculo dinámico de métricas operativas
-    val totalCuarteles = telemetriaMap.size
+    // Cálculo dinámico ajustado estrictamente a 4 cuarteles
+    val totalCuarteles = 4
     val cuartelesEnRiesgo = telemetriaMap.values.count { it.tieneRiesgo }
     val bombasEncendidas = actuadoresMap.values.count { it.bombaEncendida }
 
-    // Obtener la fecha y hora de la última inspección realizada
     val ultimaVisita = visitasGps.firstOrNull()?.let {
         "${it.cuartel} (${it.fechaHora})"
     } ?: "Sin registros hoy"
@@ -105,7 +104,7 @@ fun HomeContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Encabezado principal
+        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -139,7 +138,7 @@ fun HomeContent(
             }
         }
 
-        // 2. Tarjeta de Estado Global Dinámica
+        // Estado Global
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -176,7 +175,7 @@ fun HomeContent(
             }
         }
 
-        // 3. Selección de Cuarteles (4 Cuarteles)
+        // Selección de Cuarteles
         Text(
             text = "Seleccionar Cuartel",
             style = MaterialTheme.typography.titleLarge.copy(
@@ -213,7 +212,7 @@ fun HomeContent(
             val c3 = telemetriaMap["Cuartel 3"]
             CuartelCard(
                 title = "Cuartel 3",
-                status = c3?.estadoGlobal ?: "Riesgo Helada",
+                status = c3?.estadoGlobal ?: "Estado OK",
                 modifier = Modifier.weight(1f),
                 onClick = { onCuartelSelected("Cuartel 3") }
             )
@@ -221,15 +220,23 @@ fun HomeContent(
             val c4 = telemetriaMap["Cuartel 4"]
             CuartelCard(
                 title = "Cuartel 4",
-                status = c4?.estadoGlobal ?: "Falta de Riego",
+                status = c4?.estadoGlobal ?: "Estado OK",
                 modifier = Modifier.weight(1f),
                 onClick = { onCuartelSelected("Cuartel 4") }
             )
         }
 
-        // 4. Resumen General del Predio (Telemetría Promedio)
+        // Resumen Promedio
+        val cuartelesList = telemetriaMap.values.toList()
+        fun extraerNumero(texto: String): Double = texto.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 0.0
+
+        val tempProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.1f °C", cuartelesList.sumOf { extraerNumero(it.temperatura) } / cuartelesList.size) else "18.5 °C"
+        val humProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f %%", cuartelesList.sumOf { extraerNumero(it.humedadSuelo) } / cuartelesList.size) else "68 %"
+        val caudalProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f L/min", cuartelesList.sumOf { extraerNumero(it.caudal) } / cuartelesList.size) else "45 L/min"
+        val radProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f W/m²", cuartelesList.sumOf { extraerNumero(it.radiacionSolar) } / cuartelesList.size) else "650 W/m²"
+
         Text(
-            text = "Resumen General del Predio",
+            text = "Resumen General del Predio (Promedio)",
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Bold,
                 color = AgroGreenPrimary
@@ -254,14 +261,14 @@ fun HomeContent(
                         icon = Icons.Default.Thermostat,
                         iconTint = Color(0xFFE57373),
                         label = "Temp. Promedio",
-                        value = "18.5 °C",
+                        value = tempProm,
                         modifier = Modifier.weight(1f)
                     )
                     MetricItem(
                         icon = Icons.Default.WaterDrop,
                         iconTint = Color(0xFF64B5F6),
                         label = "Humedad Suelo",
-                        value = "68 %",
+                        value = humProm,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -276,21 +283,21 @@ fun HomeContent(
                         icon = Icons.Default.Speed,
                         iconTint = Color(0xFF81C784),
                         label = "Caudal Riego",
-                        value = "45 L/min",
+                        value = caudalProm,
                         modifier = Modifier.weight(1f)
                     )
                     MetricItem(
                         icon = Icons.Default.WbSunny,
                         iconTint = Color(0xFFFFB74D),
                         label = "Radiación Solar",
-                        value = "650 W/m²",
+                        value = radProm,
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
         }
 
-        // 5. Centro de Control Operativo
+        // Centro de Control Operativo
         Text(
             text = "Centro de Control Operativo",
             style = MaterialTheme.typography.titleMedium.copy(

@@ -87,11 +87,11 @@ fun ActuadoresScreen(
                 onCheckedChange = { viewModel.actualizarValvula(cuartelName) }
             )
 
-            // 3. Sistema de Mitigación de Heladas (Control asistido)
+            // 3. Sistema de Mitigación de Heladas (Independiente)
             ActuadorCard(
                 title = "Sistema Anti-Heladas (Asistido)",
-                subtitle = if (estadoActual.bombaEncendida) "Activado mediante Bomba" else "Inactivo",
-                isActive = estadoActual.bombaEncendida,
+                subtitle = if (estadoActual.antiHeladasActivo) "Estado: Activado (Protección activa)" else "Estado: Inactivo",
+                isActive = estadoActual.antiHeladasActivo,
                 onCheckedChange = { viewModel.actualizarAntiHeladas(cuartelName) }
             )
         }

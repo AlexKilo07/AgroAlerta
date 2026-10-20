@@ -36,13 +36,16 @@ import com.example.agroalerta.ui.theme.AgroTextMuted
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    usuarioNombre: String = "Administrador General",
+    usuarioRol: String = "Usuario Administrador",
+    onLogoutClick: () -> Unit = {},
     viewModel: AgroViewModel = viewModel()
 ) {
     var cuartelObjetivo by remember { mutableStateOf("Cuartel 1") }
     var expandedCuartelMenu by remember { mutableStateOf(false) }
     var pushNotificationsEnabled by remember { mutableStateOf(true) }
 
-    val listaCuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4", "Predio General")
+    val listaCuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4")
 
     Scaffold(
         topBar = {
@@ -95,12 +98,12 @@ fun SettingsScreen(
                         )
                     }
                     HorizontalDivider(color = Color(0xFFEEEEEE))
-                    Text("Juan Pérez", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AgroTextDark)
-                    Text("Supervisor de Campo", fontSize = 13.sp, color = AgroTextMuted)
+                    Text(usuarioNombre, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AgroTextDark)
+                    Text(usuarioRol, fontSize = 13.sp, color = AgroGreenPrimary, fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            // 2. Simulador de Telemetría (3 Estados de Riesgo + Restablecer)
+            // 2. Simulador de Telemetría
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -135,7 +138,6 @@ fun SettingsScreen(
                         color = AgroTextMuted
                     )
 
-                    // Select Dropdown para Cuartel Objetivo
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedCard(
                             modifier = Modifier
@@ -176,16 +178,13 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Fila 1: Helada y Baja Humedad
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
                             onClick = { viewModel.simularHeladaCuartel(cuartelObjetivo) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp),
+                            modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9383A)),
                             contentPadding = PaddingValues(horizontal = 8.dp)
@@ -197,9 +196,7 @@ fun SettingsScreen(
 
                         Button(
                             onClick = { viewModel.simularBajaHumedadCuartel(cuartelObjetivo) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp),
+                            modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
                             contentPadding = PaddingValues(horizontal = 8.dp)
@@ -210,16 +207,13 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Fila 2: Estanque y Restablecer
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
                             onClick = { viewModel.simularBajoEstanqueCuartel(cuartelObjetivo) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp),
+                            modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0288D1)),
                             contentPadding = PaddingValues(horizontal = 8.dp)
@@ -231,9 +225,7 @@ fun SettingsScreen(
 
                         Button(
                             onClick = { viewModel.restablecerCuartel(cuartelObjetivo) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp),
+                            modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary),
                             contentPadding = PaddingValues(horizontal = 8.dp)
@@ -324,9 +316,7 @@ fun SettingsScreen(
 
                     Button(
                         onClick = { viewModel.refrescarTelemetria() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary)
                     ) {
@@ -384,7 +374,7 @@ fun SettingsScreen(
 
             // 6. Botón Cerrar Sesión
             OutlinedButton(
-                onClick = { },
+                onClick = onLogoutClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),

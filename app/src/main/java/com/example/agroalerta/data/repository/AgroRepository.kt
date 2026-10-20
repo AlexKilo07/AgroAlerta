@@ -2,6 +2,7 @@ package com.example.agroalerta.data.repository
 
 import android.content.Context
 import com.example.agroalerta.data.local.AgroDatabaseHelper
+import com.example.agroalerta.data.model.AlertaItem
 import com.example.agroalerta.data.model.TelemetriaCuartel
 import com.example.agroalerta.data.model.VisitaGps
 import kotlinx.coroutines.CoroutineScope
@@ -15,11 +16,11 @@ import java.util.Date
 import java.util.Locale
 import kotlin.random.Random
 
-// Modelo de estado para Actuadores (Bombas y Válvulas)
 data class ActuadorState(
     val cuartelId: String,
     val bombaEncendida: Boolean = false,
-    val valvulaAbierta: Boolean = false
+    val valvulaAbierta: Boolean = false,
+    val antiHeladasActivo: Boolean = false
 )
 
 object AgroRepository {
@@ -27,7 +28,6 @@ object AgroRepository {
     private val scope = CoroutineScope(Dispatchers.IO)
     private var dbHelper: AgroDatabaseHelper? = null
 
-    // Estados reactivos (StateFlow)
     private val _telemetriaMap = MutableStateFlow<Map<String, TelemetriaCuartel>>(emptyMap())
     val telemetriaMap: StateFlow<Map<String, TelemetriaCuartel>> = _telemetriaMap.asStateFlow()
 
@@ -37,11 +37,9 @@ object AgroRepository {
     private val _visitasGps = MutableStateFlow<List<VisitaGps>>(emptyList())
     val visitasGps: StateFlow<List<VisitaGps>> = _visitasGps.asStateFlow()
 
-    // Persistencia de Alertas Atendidas (Clave: "Cuartel|Titulo")
-    private val _alertasAtendidas = MutableStateFlow<Set<String>>(emptySet())
-    val alertasAtendidas: StateFlow<Set<String>> = _alertasAtendidas.asStateFlow()
+    private val _historialAlertas = MutableStateFlow<List<AlertaItem>>(emptyList())
+    val historialAlertas: StateFlow<List<AlertaItem>> = _historialAlertas.asStateFlow()
 
-    // Indicador de Conectividad (Online vs Offline)
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
 
@@ -49,29 +47,41 @@ object AgroRepository {
         if (dbHelper == null) {
             dbHelper = AgroDatabaseHelper(context)
 
-            // Cargar visitas y alertas atendidas desde SQLite
             scope.launch {
+                // 1. Cargar Visitas GPS
                 val guardadas = dbHelper?.obtenerVisitas() ?: emptyList()
                 _visitasGps.value = guardadas
 
-                val atendidas = dbHelper?.obtenerAlertasAtendidas() ?: emptySet()
-                _alertasAtendidas.value = atendidas
+                // 2. Cargar Historial de Alertas Atendidas
+                val historial = dbHelper?.obtenerHistorialAlertasAtendidas() ?: emptyList()
+                _historialAlertas.value = historial
+
+                // 3. Cargar Actuadores desde SQLite
+                val actuadoresPersistidos = dbHelper?.obtenerActuadores() ?: emptyMap()
+                if (actuadoresPersistidos.isNotEmpty()) {
+                    _actuadoresMap.value = actuadoresPersistidos
+                } else {
+                    val defaultActuadores = mapOf(
+                        "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = true, valvulaAbierta = true, antiHeladasActivo = false),
+                        "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
+                        "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = true, valvulaAbierta = true, antiHeladasActivo = true),
+                        "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false)
+                    )
+                    _actuadoresMap.value = defaultActuadores
+                    defaultActuadores.values.forEach { dbHelper?.guardarActuador(it) }
+                }
+
+                // 4. Cargar Telemetría local
+                val datosPersistidos = dbHelper?.obtenerTelemetriaLocal() ?: emptyList()
+                if (datosPersistidos.isNotEmpty()) {
+                    _telemetriaMap.value = datosPersistidos.associateBy { it.cuartelId }
+                } else {
+                    sincronizarTelemetria()
+                }
             }
-
-            // Inicializar estado por defecto de actuadores
-            _actuadoresMap.value = mapOf(
-                "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = true, valvulaAbierta = true),
-                "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false),
-                "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = true, valvulaAbierta = true),
-                "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false)
-            )
-
-            // Primera sincronización al arrancar
-            sincronizarTelemetria()
         }
     }
 
-    // Lógica de Sincronización Online/Offline
     fun sincronizarTelemetria(simularErrorRed: Boolean = false) {
         scope.launch {
             try {
@@ -79,20 +89,13 @@ object AgroRepository {
                     throw Exception("Error de red simulado para probar Modo Offline")
                 }
 
-                // 1. SIMULACIÓN / PETICIÓN REST (Genera datos dinámicos)
                 val nuevosDatos = generarTelemetriaDinamica()
-
-                // 2. Guardar inmediatamente en Caché Local SQLite
                 dbHelper?.guardarTelemetriaLocal(nuevosDatos)
-
-                // 3. Actualizar la UI y marcar como ONLINE
                 _telemetriaMap.value = nuevosDatos.associateBy { it.cuartelId }
                 _isOffline.value = false
 
             } catch (e: Exception) {
-                // 4. Si la red falla (MODO OFFLINE), cargar desde SQLite
                 val datosOffline = dbHelper?.obtenerTelemetriaLocal() ?: emptyList()
-
                 if (datosOffline.isNotEmpty()) {
                     _telemetriaMap.value = datosOffline.associateBy { it.cuartelId }
                 }
@@ -101,32 +104,30 @@ object AgroRepository {
         }
     }
 
-    // Genera mediciones aleatorias garantizando los 3 tipos de alerta para pruebas
     private fun generarTelemetriaDinamica(): List<TelemetriaCuartel> {
-        val nombresCuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4", "Predio General")
+        val nombresCuarteles = listOf("Cuartel 1", "Cuartel 2", "Cuartel 3", "Cuartel 4")
         return nombresCuarteles.map { nombre ->
-            val tempVal = Random.nextDouble(14.0, 26.0)
-            val humSueloVal = Random.nextInt(40, 85)
+            var tempVal = Random.nextDouble(14.0, 24.0)
+            var humSueloVal = Random.nextInt(55, 80)
             val caudalVal = Random.nextInt(20, 60)
             val radVal = Random.nextInt(400, 800)
             val humRelVal = Random.nextInt(50, 90)
 
             val tieneRiesgo = when (nombre) {
-                "Cuartel 3" -> true // Alerta Tipo Helada
-                "Cuartel 4" -> true // Alerta Tipo Humedad
-                "Predio General" -> true // Alerta Tipo Estanque
-                else -> tempVal < 2.0 || humSueloVal < 45
+                "Cuartel 3" -> true
+                "Cuartel 4" -> true
+                else -> false
             }
 
-            val estadoGlobal = when (nombre) {
-                "Cuartel 3" -> "Riesgo de Helada Crítica"
-                "Cuartel 4" -> "Baja Humedad Crítica en Suelo"
-                "Predio General" -> "Bajo Nivel de Estanque"
-                else -> when {
-                    tempVal < 2.0 -> "Riesgo de Helada Crítica"
-                    humSueloVal < 45 -> "Baja Humedad Crítica en Suelo"
-                    else -> "Estado OK"
-                }
+            when (nombre) {
+                "Cuartel 3" -> { tempVal = Random.nextDouble(-2.5, 0.5) }
+                "Cuartel 4" -> { humSueloVal = Random.nextInt(15, 35) }
+            }
+
+            val estadoGlobal = when {
+                tempVal < 2.0 -> "Riesgo de Helada Crítica"
+                humSueloVal < 45 -> "Baja Humedad Crítica en Suelo"
+                else -> "Estado OK"
             }
 
             TelemetriaCuartel(
@@ -142,7 +143,7 @@ object AgroRepository {
         }
     }
 
-    // --- Simulaciones Individuales por Cuartel desde Ajustes ---
+    // --- Simulaciones Individuales ---
     fun simularHeladaCuartel(cuartelId: String) {
         val mapaActual = _telemetriaMap.value.toMutableMap()
         val actual = mapaActual[cuartelId] ?: TelemetriaCuartel(
@@ -154,13 +155,16 @@ object AgroRepository {
             humedadRelativa = "50 %"
         )
 
-        mapaActual[cuartelId] = actual.copy(
+        val modificado = actual.copy(
             temperatura = "-1.8 °C",
             humedadRelativa = "88 %",
             tieneRiesgo = true,
             estadoGlobal = "Riesgo de Helada Crítica"
         )
+        mapaActual[cuartelId] = modificado
         _telemetriaMap.value = mapaActual
+
+        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
     }
 
     fun simularBajaHumedadCuartel(cuartelId: String) {
@@ -174,13 +178,16 @@ object AgroRepository {
             humedadRelativa = "40 %"
         )
 
-        mapaActual[cuartelId] = actual.copy(
+        val modificado = actual.copy(
             humedadSuelo = "18 %",
             caudal = "5 L/min",
             tieneRiesgo = true,
             estadoGlobal = "Baja Humedad Crítica en Suelo"
         )
+        mapaActual[cuartelId] = modificado
         _telemetriaMap.value = mapaActual
+
+        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
     }
 
     fun simularBajoEstanqueCuartel(cuartelId: String) {
@@ -194,12 +201,15 @@ object AgroRepository {
             humedadRelativa = "50 %"
         )
 
-        mapaActual[cuartelId] = actual.copy(
+        val modificado = actual.copy(
             caudal = "0 L/min",
             tieneRiesgo = true,
             estadoGlobal = "Bajo Nivel de Estanque"
         )
+        mapaActual[cuartelId] = modificado
         _telemetriaMap.value = mapaActual
+
+        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
     }
 
     fun restablecerCuartel(cuartelId: String) {
@@ -213,19 +223,19 @@ object AgroRepository {
             humedadRelativa = "55 %"
         )
 
-        mapaActual[cuartelId] = actual.copy(
+        val modificado = actual.copy(
             temperatura = "19.5 °C",
             humedadSuelo = "65 %",
             caudal = "45 L/min",
             tieneRiesgo = false,
             estadoGlobal = "Estado OK"
         )
+        mapaActual[cuartelId] = modificado
         _telemetriaMap.value = mapaActual
+
+        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
     }
 
-    fun actualizarLecturasAleatorias(cuartelId: String) {}
-
-    // Registro GPS en SQLite
     fun registrarVisitaTerreno(cuartel: String, lat: Double, lng: Double) {
         val formato = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         val fecha = formato.format(Date())
@@ -237,36 +247,68 @@ object AgroRepository {
         }
     }
 
-    // Marcar Alerta como Vista con Persistencia en SQLite
-    fun marcarAlertaAtendida(cuartel: String, titulo: String) {
+    fun marcarAlertaAtendida(cuartel: String, titulo: String, fechaHora: String) {
         scope.launch {
-            dbHelper?.marcarAlertaComoVista(titulo, cuartel)
-            val clave = "$cuartel|$titulo"
-            _alertasAtendidas.value = _alertasAtendidas.value + clave
+            // 1. Guardar en SQLite para el historial
+            dbHelper?.marcarAlertaComoVista(titulo, cuartel, fechaHora)
+
+            // 2. Cargar el historial actualizado
+            val historialActualizado = dbHelper?.obtenerHistorialAlertasAtendidas() ?: emptyList()
+            _historialAlertas.value = historialActualizado
+
+            // 3. Quitar la condición de riesgo del cuartel para eliminar la alerta activa
+            val mapaActual = _telemetriaMap.value.toMutableMap()
+            mapaActual[cuartel]?.let { actual ->
+                val modificado = actual.copy(
+                    tieneRiesgo = false,
+                    estadoGlobal = "Estado OK"
+                )
+                mapaActual[cuartel] = modificado
+                _telemetriaMap.value = mapaActual
+                dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList())
+            }
         }
     }
 
-    // Restaurar alertas atendidas (para reiniciar el historial desde pruebas)
     fun restaurarAlertas() {
         scope.launch {
             dbHelper?.limpiarAlertasAtendidas()
-            _alertasAtendidas.value = emptySet()
+            _historialAlertas.value = emptyList()
             sincronizarTelemetria()
         }
     }
 
-    // Conmutadores de Actuadores
+    // --- Actuadores con Persistencia Inmediata ---
     fun toggleBomba(cuartelId: String) {
         val actual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoEstado = actual.copy(bombaEncendida = !actual.bombaEncendida)
+
         val nuevoMap = _actuadoresMap.value.toMutableMap()
-        nuevoMap[cuartelId] = actual.copy(bombaEncendida = !actual.bombaEncendida)
+        nuevoMap[cuartelId] = nuevoEstado
         _actuadoresMap.value = nuevoMap
+
+        scope.launch { dbHelper?.guardarActuador(nuevoEstado) }
     }
 
     fun toggleValvula(cuartelId: String) {
         val actual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoEstado = actual.copy(valvulaAbierta = !actual.valvulaAbierta)
+
         val nuevoMap = _actuadoresMap.value.toMutableMap()
-        nuevoMap[cuartelId] = actual.copy(valvulaAbierta = !actual.valvulaAbierta)
+        nuevoMap[cuartelId] = nuevoEstado
         _actuadoresMap.value = nuevoMap
+
+        scope.launch { dbHelper?.guardarActuador(nuevoEstado) }
+    }
+
+    fun toggleAntiHeladas(cuartelId: String) {
+        val actual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoEstado = actual.copy(antiHeladasActivo = !actual.antiHeladasActivo)
+
+        val nuevoMap = _actuadoresMap.value.toMutableMap()
+        nuevoMap[cuartelId] = nuevoEstado
+        _actuadoresMap.value = nuevoMap
+
+        scope.launch { dbHelper?.guardarActuador(nuevoEstado) }
     }
 }

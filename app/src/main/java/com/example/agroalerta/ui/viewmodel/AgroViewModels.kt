@@ -9,7 +9,7 @@ import com.example.agroalerta.data.repository.ActuadorState
 import com.example.agroalerta.data.repository.AgroRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -29,55 +29,21 @@ class AgroViewModel : ViewModel() {
     // 4. Indicador de conectividad Online/Offline
     val isOffline: StateFlow<Boolean> = AgroRepository.isOffline
 
-    // 5. Alertas Activas (Pendientes de revisar)
-    val alertasActivas: StateFlow<List<AlertaItem>> = combine(
-        telemetriaMap,
-        AgroRepository.alertasAtendidas
-    ) { mapa, atendidas ->
+    // 5. Historial acumulado de alertas marcadas como atendidas desde AgroRepository
+    val historialAlertas: StateFlow<List<AlertaItem>> = AgroRepository.historialAlertas
+
+    // 6. Alertas Activas (Se generan dinámicamente según la telemetría de cada cuartel)
+    val alertasActivas: StateFlow<List<AlertaItem>> = telemetriaMap.map { mapa ->
         val formatoHora = SimpleDateFormat("HH:mm", Locale.getDefault())
         val horaActual = formatoHora.format(Date())
 
-        mapa.values.filter { it.tieneRiesgo }.mapIndexedNotNull { index, telemetria ->
-            val clave = "${telemetria.cuartelId}|${telemetria.estadoGlobal}"
-            if (!atendidas.contains(clave)) {
-                AlertaItem(
-                    id = index + 1,
-                    cuartel = telemetria.cuartelId,
-                    titulo = telemetria.estadoGlobal,
-                    fechaHora = horaActual,
-                    esCritica = telemetria.estadoGlobal.contains("Helada") || telemetria.estadoGlobal.contains(
-                        "Crítica"
-                    )
-                )
-            } else {
-                null
-            }
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
-    )
-
-    // 6. Historial de Alertas Atendidas (Persistente)
-    val historialAlertas: StateFlow<List<AlertaItem>> = combine(
-        telemetriaMap,
-        AgroRepository.alertasAtendidas
-    ) { mapa, atendidas ->
-        val formatoHora = SimpleDateFormat("HH:mm", Locale.getDefault())
-        val horaActual = formatoHora.format(Date())
-
-        atendidas.mapIndexed { index, clave ->
-            val partes = clave.split("|")
-            val cuartel = partes.getOrElse(0) { "Predio" }
-            val titulo = partes.getOrElse(1) { "Evento Atendido" }
-
+        mapa.values.filter { it.tieneRiesgo }.mapIndexed { index, telemetria ->
             AlertaItem(
-                id = 100 + index,
-                cuartel = cuartel,
-                titulo = titulo,
+                id = index + 1,
+                cuartel = telemetria.cuartelId,
+                titulo = telemetria.estadoGlobal,
                 fechaHora = horaActual,
-                esCritica = titulo.contains("Helada") || titulo.contains("Crítica")
+                esCritica = telemetria.estadoGlobal.contains("Helada") || telemetria.estadoGlobal.contains("Crítica")
             )
         }
     }.stateIn(
@@ -86,9 +52,12 @@ class AgroViewModel : ViewModel() {
         initialValue = emptyList()
     )
 
-    // Marcar como vista
+    // Marcar como vista: registra la alerta atendida en SQLite con la hora exacta
+    // la traslada de Activas al Historial
     fun marcarAlertaComoVista(alerta: AlertaItem) {
-        AgroRepository.marcarAlertaAtendida(alerta.cuartel, alerta.titulo)
+        val formatoHora = SimpleDateFormat("HH:mm - dd/MM", Locale.getDefault())
+        val fechaHoraActual = formatoHora.format(Date())
+        AgroRepository.marcarAlertaAtendida(alerta.cuartel, alerta.titulo, fechaHoraActual)
     }
 
     // Métodos para controlar actuadores
@@ -101,7 +70,7 @@ class AgroViewModel : ViewModel() {
     }
 
     fun actualizarAntiHeladas(cuartelId: String) {
-        AgroRepository.toggleBomba(cuartelId)
+        AgroRepository.toggleAntiHeladas(cuartelId)
     }
 
     fun refrescarTelemetria() {
