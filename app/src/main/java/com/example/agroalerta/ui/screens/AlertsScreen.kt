@@ -29,6 +29,10 @@ import com.example.agroalerta.ui.theme.AgroBackground
 import com.example.agroalerta.ui.theme.AgroGreenPrimary
 import com.example.agroalerta.ui.theme.AgroTextDark
 import com.example.agroalerta.ui.theme.AgroTextMuted
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,12 +47,70 @@ fun AlertsScreen(
     // Filtros para la vista de Alertas Activas (Chips)
     var filtroTipoSelected by remember { mutableStateOf("Todas") }
 
-    // Filtros para la vista de Historial (Dropdowns según captura)
+    // Filtros para la vista de Historial
     var fechaSelected by remember { mutableStateOf("Hoy") }
     var tipoEventoSelected by remember { mutableStateOf("Todos") }
 
     var expandedFecha by remember { mutableStateOf(false) }
     var expandedTipo by remember { mutableStateOf(false) }
+
+    // Función Helper para comprobar si una fecha dada en String entra en el rango del filtro
+    fun coincideConFiltroFecha(fechaHoraStr: String, filtro: String): Boolean {
+        if (filtro == "Todas") return true
+
+        val sdfVisual = SimpleDateFormat("HH:mm - dd/MM", Locale.getDefault())
+        val sdfSoloHora = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+        val fechaAlertaCalendar = Calendar.getInstance()
+        val fechaAlertaDate = try {
+            if (fechaHoraStr.contains("-")) {
+                sdfVisual.parse(fechaHoraStr)
+            } else {
+                // Si solo viene la hora, asumimos que fue ingresada Hoy
+                val dateSoloHora = sdfSoloHora.parse(fechaHoraStr)
+                if (dateSoloHora != null) {
+                    val calHoy = Calendar.getInstance()
+                    val calHora = Calendar.getInstance().apply { time = dateSoloHora }
+                    calHoy.set(Calendar.HOUR_OF_DAY, calHora.get(Calendar.HOUR_OF_DAY))
+                    calHoy.set(Calendar.MINUTE, calHora.get(Calendar.MINUTE))
+                    calHoy.time
+                } else null
+            }
+        } catch (e: Exception) {
+            null
+        } ?: return true
+
+        // Ajustar el año actual para las alertas analizadas
+        fechaAlertaCalendar.time = fechaAlertaDate
+        val calActual = Calendar.getInstance()
+        fechaAlertaCalendar.set(Calendar.YEAR, calActual.get(Calendar.YEAR))
+
+        val hoyInicio = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        return when (filtro) {
+            "Hoy" -> {
+                fechaAlertaCalendar.timeInMillis >= hoyInicio.timeInMillis
+            }
+            "Ayer" -> {
+                val ayerInicio = (hoyInicio.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+                fechaAlertaCalendar.timeInMillis >= ayerInicio.timeInMillis && fechaAlertaCalendar.timeInMillis < hoyInicio.timeInMillis
+            }
+            "Última semana" -> {
+                val semanaAtras = (hoyInicio.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -7) }
+                fechaAlertaCalendar.timeInMillis >= semanaAtras.timeInMillis
+            }
+            "Último mes" -> {
+                val mesAtras = (hoyInicio.clone() as Calendar).apply { add(Calendar.MONTH, -1) }
+                fechaAlertaCalendar.timeInMillis >= mesAtras.timeInMillis
+            }
+            else -> true
+        }
+    }
 
     // Filtrado dinámico según la pestaña activa
     val listaAlertasFiltradas = remember(
@@ -66,7 +128,8 @@ fun AlertsScreen(
                 else -> alertasActivas
             }
         } else {
-            when (tipoEventoSelected) {
+            // Filtrar primero por Tipo y luego por Fecha
+            val porTipo = when (tipoEventoSelected) {
                 "Heladas" -> historialAlertas.filter { it.titulo.contains("Helada", ignoreCase = true) }
                 "Riego / Humedad" -> historialAlertas.filter {
                     it.titulo.contains("Humedad", ignoreCase = true) || it.titulo.contains("Riego", ignoreCase = true)
@@ -76,6 +139,8 @@ fun AlertsScreen(
                 }
                 else -> historialAlertas
             }
+
+            porTipo.filter { coincideConFiltroFecha(it.fechaHora, fechaSelected) }
         }
     }
 
@@ -184,7 +249,7 @@ fun AlertsScreen(
                     }
                 }
             } else {
-                // Filtros con Tarjeta Dropdown (Exactos a la captura de pantalla del Historial)
+                // Filtros con Tarjeta Dropdown para Historial
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -232,7 +297,7 @@ fun AlertsScreen(
                                     expanded = expandedFecha,
                                     onDismissRequest = { expandedFecha = false }
                                 ) {
-                                    listOf("Hoy", "Ayer", "Última semana", "Todas").forEach { opcion ->
+                                    listOf("Hoy", "Ayer", "Última semana", "Último mes", "Todas").forEach { opcion ->
                                         DropdownMenuItem(
                                             text = { Text(opcion) },
                                             onClick = {
@@ -404,7 +469,7 @@ fun TarjetaAlertaActiva(
     }
 }
 
-// Vista 2: Tarjeta con Línea de Tiempo para Historial de Eventos (Diseño exacto de la captura)
+// Vista 2: Tarjeta con Línea de Tiempo para Historial de Eventos
 @Composable
 fun TarjetaHistorialTimeline(
     alerta: AlertaItem,
@@ -455,7 +520,6 @@ fun TarjetaHistorialTimeline(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Icono circular según tipo de evento
                     val isHelada = alerta.titulo.contains("Helada", ignoreCase = true)
                     val iconBgColor = if (isHelada) Color(0xFFFFF0F0) else Color(0xFFE8F5E9)
                     val iconTint = if (isHelada) Color(0xFFD9383A) else AgroGreenPrimary
@@ -496,7 +560,6 @@ fun TarjetaHistorialTimeline(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Estado (Atendida. / Resuelto.)
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Color(0xFFEDF4EE)
