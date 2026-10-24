@@ -56,20 +56,35 @@ object AgroRepository {
                 val historial = dbHelper?.obtenerHistorialAlertasAtendidas() ?: emptyList()
                 _historialAlertas.value = historial
 
-                // 3. Cargar Actuadores desde SQLite
-                val actuadoresPersistidos = dbHelper?.obtenerActuadores() ?: emptyMap()
-                if (actuadoresPersistidos.isNotEmpty()) {
-                    _actuadoresMap.value = actuadoresPersistidos
-                } else {
-                    val defaultActuadores = mapOf(
-                        "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = true, valvulaAbierta = true, antiHeladasActivo = false),
-                        "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-                        "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = true, valvulaAbierta = true, antiHeladasActivo = true),
-                        "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false)
+                // 3. Forzar actuadores apagados por defecto en SQLite
+                val defaultActuadores = mapOf(
+                    "Cuartel 1" to ActuadorState(
+                        "Cuartel 1",
+                        bombaEncendida = false,
+                        valvulaAbierta = false,
+                        antiHeladasActivo = false
+                    ),
+                    "Cuartel 2" to ActuadorState(
+                        "Cuartel 2",
+                        bombaEncendida = false,
+                        valvulaAbierta = false,
+                        antiHeladasActivo = false
+                    ),
+                    "Cuartel 3" to ActuadorState(
+                        "Cuartel 3",
+                        bombaEncendida = false,
+                        valvulaAbierta = false,
+                        antiHeladasActivo = false
+                    ),
+                    "Cuartel 4" to ActuadorState(
+                        "Cuartel 4",
+                        bombaEncendida = false,
+                        valvulaAbierta = false,
+                        antiHeladasActivo = false
                     )
-                    _actuadoresMap.value = defaultActuadores
-                    defaultActuadores.values.forEach { dbHelper?.guardarActuador(it) }
-                }
+                )
+                _actuadoresMap.value = defaultActuadores
+                defaultActuadores.values.forEach { dbHelper?.guardarActuador(it) }
 
                 // 4. Cargar Telemetría local
                 val datosPersistidos = dbHelper?.obtenerTelemetriaLocal() ?: emptyList()
@@ -120,8 +135,13 @@ object AgroRepository {
             }
 
             when (nombre) {
-                "Cuartel 3" -> { tempVal = Random.nextDouble(-2.5, 0.5) }
-                "Cuartel 4" -> { humSueloVal = Random.nextInt(15, 35) }
+                "Cuartel 3" -> {
+                    tempVal = Random.nextDouble(-2.5, 0.5)
+                }
+
+                "Cuartel 4" -> {
+                    humSueloVal = Random.nextInt(15, 35)
+                }
             }
 
             val estadoGlobal = when {
@@ -278,7 +298,7 @@ object AgroRepository {
         }
     }
 
-    // --- Actuadores con Persistencia Inmediata ---
+    // --- Actuadores con Mitigación Específica por Alerta ---
     fun toggleBomba(cuartelId: String) {
         val actual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
         val nuevoEstado = actual.copy(bombaEncendida = !actual.bombaEncendida)
@@ -286,6 +306,22 @@ object AgroRepository {
         val nuevoMap = _actuadoresMap.value.toMutableMap()
         nuevoMap[cuartelId] = nuevoEstado
         _actuadoresMap.value = nuevoMap
+
+        // Bomba principal soluciona el Bajo Nivel de Estanque
+        if (nuevoEstado.bombaEncendida) {
+            val mapaTele = _telemetriaMap.value.toMutableMap()
+            mapaTele[cuartelId]?.let { tel ->
+                if (tel.estadoGlobal.contains("Estanque")) {
+                    mapaTele[cuartelId] = tel.copy(
+                        caudal = "45 L/min",
+                        tieneRiesgo = false,
+                        estadoGlobal = "Estado OK"
+                    )
+                    _telemetriaMap.value = mapaTele
+                    scope.launch { dbHelper?.guardarTelemetriaLocal(mapaTele.values.toList()) }
+                }
+            }
+        }
 
         scope.launch { dbHelper?.guardarActuador(nuevoEstado) }
     }
@@ -298,6 +334,22 @@ object AgroRepository {
         nuevoMap[cuartelId] = nuevoEstado
         _actuadoresMap.value = nuevoMap
 
+        // Válvula de riego soluciona la Baja Humedad
+        if (nuevoEstado.valvulaAbierta) {
+            val mapaTele = _telemetriaMap.value.toMutableMap()
+            mapaTele[cuartelId]?.let { tel ->
+                if (tel.estadoGlobal.contains("Humedad")) {
+                    mapaTele[cuartelId] = tel.copy(
+                        humedadSuelo = "65 %",
+                        tieneRiesgo = false,
+                        estadoGlobal = "Estado OK"
+                    )
+                    _telemetriaMap.value = mapaTele
+                    scope.launch { dbHelper?.guardarTelemetriaLocal(mapaTele.values.toList()) }
+                }
+            }
+        }
+
         scope.launch { dbHelper?.guardarActuador(nuevoEstado) }
     }
 
@@ -308,6 +360,22 @@ object AgroRepository {
         val nuevoMap = _actuadoresMap.value.toMutableMap()
         nuevoMap[cuartelId] = nuevoEstado
         _actuadoresMap.value = nuevoMap
+
+        // Sistema Anti-Heladas soluciona el Riesgo de Helada
+        if (nuevoEstado.antiHeladasActivo) {
+            val mapaTele = _telemetriaMap.value.toMutableMap()
+            mapaTele[cuartelId]?.let { tel ->
+                if (tel.estadoGlobal.contains("Helada")) {
+                    mapaTele[cuartelId] = tel.copy(
+                        temperatura = "3.5 °C",
+                        tieneRiesgo = false,
+                        estadoGlobal = "Estado OK"
+                    )
+                    _telemetriaMap.value = mapaTele
+                    scope.launch { dbHelper?.guardarTelemetriaLocal(mapaTele.values.toList()) }
+                }
+            }
+        }
 
         scope.launch { dbHelper?.guardarActuador(nuevoEstado) }
     }

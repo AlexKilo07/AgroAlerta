@@ -34,6 +34,10 @@ import androidx.compose.ui.unit.sp
 import com.example.agroalerta.data.repository.AgroRepository
 import com.example.agroalerta.ui.theme.*
 import java.util.Locale
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun HomeScreen(
@@ -86,6 +90,37 @@ fun HomeContent(
     val actuadoresMap by AgroRepository.actuadoresMap.collectAsState()
     val visitasGps by AgroRepository.visitasGps.collectAsState()
 
+// Obtenemos el contexto actual de Android para revisar el internet real
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    // Función interna para verificar si hay conexión real a Internet
+    fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+    }
+
+    // Estado reactivo que detecta si estamos offline
+    var isOffline by remember { mutableStateOf(!isNetworkAvailable(context)) }
+
+    // Este DisposableEffect vigila el ciclo de vida de la app:
+    // Cada vez que vuelves a abrirla desde segundo plano (onResume), revisa la red al toque.
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isOffline = !isNetworkAvailable(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     // Cálculo dinámico ajustado estrictamente a 4 cuarteles
     val totalCuarteles = 4
     val cuartelesEnRiesgo = telemetriaMap.values.count { it.tieneRiesgo }
@@ -104,7 +139,7 @@ fun HomeContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Header
+        // Header con indicador dinámico Online / Offline basado en el sistema
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -118,25 +153,27 @@ fun HomeContent(
                 )
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // El punto cambia a rojo si no hay internet real en el teléfono
                 Box(
                     modifier = Modifier
                         .size(10.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF4CAF50))
+                        .background(if (isOffline) Color(0xFFD9383A) else Color(0xFF4CAF50))
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "En línea",
+                        text = if (isOffline) "Offline" else "En línea",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                     )
                     Text(
-                        text = "Sincronizado",
+                        text = if (isOffline) "Modo Local (SQLite)" else "Sincronizado",
                         style = MaterialTheme.typography.labelSmall.copy(color = AgroTextMuted)
                     )
                 }
             }
         }
+
 
         // Estado Global
         Card(

@@ -123,7 +123,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Simulador de Telemetría",
+                            text = "Simulador de Riesgos",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = AgroGreenPrimary
@@ -220,7 +220,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Estanque", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Estanque Bajo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Button(

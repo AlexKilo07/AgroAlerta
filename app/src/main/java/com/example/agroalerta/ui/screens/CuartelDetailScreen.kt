@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.WaterDrop
@@ -47,8 +48,6 @@ fun CuartelDetailScreen(
 ) {
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-
-    // NOTA: Se eliminó el LaunchedEffect que regeneraba la telemetría al entrar.
 
     // 1. Escuchar la telemetría en tiempo real desde el Repositorio
     val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
@@ -88,7 +87,6 @@ fun CuartelDetailScreen(
                     Toast.LENGTH_SHORT
                 ).show()
             }
-            // Navegar directamente a la pantalla de Historial GPS tras registrar
             onNavigateToHistorial()
         }.addOnFailureListener {
             Toast.makeText(context, "Error al obtener señal GPS", Toast.LENGTH_SHORT).show()
@@ -233,16 +231,32 @@ fun CuartelDetailScreen(
                 Spacer(modifier = Modifier.weight(1f))
             }
 
-            // Acceso a Actuadores
-            OutlinedButton(
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Nuevo Botón Moderno de Acceso a Actuadores
+            Button(
                 onClick = onNavigateToActuadores,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = AgroGreenPrimary)
+                    .height(54.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
-                Text("Ver Estado de Actuadores (Bombas / Riego)", fontWeight = FontWeight.Bold)
+                Icon(
+                    imageVector = Icons.Default.Power,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Panel de Actuadores",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
             }
         }
     }
