@@ -58,30 +58,10 @@ object AgroRepository {
 
                 // 3. Forzar actuadores apagados por defecto en SQLite
                 val defaultActuadores = mapOf(
-                    "Cuartel 1" to ActuadorState(
-                        "Cuartel 1",
-                        bombaEncendida = false,
-                        valvulaAbierta = false,
-                        antiHeladasActivo = false
-                    ),
-                    "Cuartel 2" to ActuadorState(
-                        "Cuartel 2",
-                        bombaEncendida = false,
-                        valvulaAbierta = false,
-                        antiHeladasActivo = false
-                    ),
-                    "Cuartel 3" to ActuadorState(
-                        "Cuartel 3",
-                        bombaEncendida = false,
-                        valvulaAbierta = false,
-                        antiHeladasActivo = false
-                    ),
-                    "Cuartel 4" to ActuadorState(
-                        "Cuartel 4",
-                        bombaEncendida = false,
-                        valvulaAbierta = false,
-                        antiHeladasActivo = false
-                    )
+                    "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
+                    "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
+                    "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
+                    "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false)
                 )
                 _actuadoresMap.value = defaultActuadores
                 defaultActuadores.values.forEach { dbHelper?.guardarActuador(it) }
@@ -135,13 +115,8 @@ object AgroRepository {
             }
 
             when (nombre) {
-                "Cuartel 3" -> {
-                    tempVal = Random.nextDouble(-2.5, 0.5)
-                }
-
-                "Cuartel 4" -> {
-                    humSueloVal = Random.nextInt(15, 35)
-                }
+                "Cuartel 3" -> { tempVal = Random.nextDouble(-2.5, 0.5) }
+                "Cuartel 4" -> { humSueloVal = Random.nextInt(15, 35) }
             }
 
             val estadoGlobal = when {
@@ -269,19 +244,18 @@ object AgroRepository {
 
     fun marcarAlertaAtendida(cuartel: String, titulo: String, fechaHora: String) {
         scope.launch {
-            // 1. Guardar en SQLite para el historial
+            // 1. Guardar en SQLite para el historial de alertas atendidas
             dbHelper?.marcarAlertaComoVista(titulo, cuartel, fechaHora)
 
             // 2. Cargar el historial actualizado
             val historialActualizado = dbHelper?.obtenerHistorialAlertasAtendidas() ?: emptyList()
             _historialAlertas.value = historialActualizado
 
-            // 3. Quitar la condición de riesgo del cuartel para eliminar la alerta activa
+            // 3. Ocultar la alerta activa quitando el flag de riesgo del mapa de telemetría local
             val mapaActual = _telemetriaMap.value.toMutableMap()
             mapaActual[cuartel]?.let { actual ->
                 val modificado = actual.copy(
-                    tieneRiesgo = false,
-                    estadoGlobal = "Estado OK"
+                    tieneRiesgo = false // Desaparece de alertas activas y pasa al historial
                 )
                 mapaActual[cuartel] = modificado
                 _telemetriaMap.value = mapaActual

@@ -57,6 +57,8 @@ class AgroViewModel : ViewModel() {
     fun marcarAlertaComoVista(alerta: AlertaItem) {
         val formatoHora = SimpleDateFormat("HH:mm - dd/MM", Locale.getDefault())
         val fechaHoraActual = formatoHora.format(Date())
+
+        // 1. Guardar en SQLite y quitar el riesgo temporalmente de la vista activa
         AgroRepository.marcarAlertaAtendida(alerta.cuartel, alerta.titulo, fechaHoraActual)
     }
 

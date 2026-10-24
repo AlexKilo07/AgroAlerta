@@ -212,7 +212,7 @@ fun AlertsScreen(
                         elevation = null
                     ) {
                         Text(
-                            text = "Historial de Eventos",
+                            text = "Historial Alertas",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold
                         )
