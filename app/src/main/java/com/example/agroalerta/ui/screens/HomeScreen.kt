@@ -1,5 +1,8 @@
 package com.example.agroalerta.ui.screens
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,17 +30,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.agroalerta.data.repository.AgroRepository
 import com.example.agroalerta.ui.theme.*
 import java.util.Locale
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import androidx.compose.ui.platform.LocalContext
+
+fun isNetworkAvailable(context: Context): Boolean {
+    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        ?: return false
+    val network = connectivityManager.activeNetwork ?: return false
+    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+    return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+}
+
+fun extraerNumero(texto: String): Double {
+    return texto.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 0.0
+}
 
 @Composable
 fun HomeScreen(
@@ -47,7 +64,12 @@ fun HomeScreen(
     onNavigateToInicio: () -> Unit = {},
     onNavigateToAlertas: () -> Unit = {},
     onNavigateToAjustes: () -> Unit = {},
-    content: @Composable (PaddingValues) -> Unit
+    content: @Composable (PaddingValues) -> Unit = { innerPadding ->
+        HomeContent(
+            paddingValues = innerPadding,
+            onCuartelSelected = onCuartelSelected
+        )
+    }
 ) {
     Scaffold(
         modifier = modifier,
@@ -90,28 +112,14 @@ fun HomeContent(
     val actuadoresMap by AgroRepository.actuadoresMap.collectAsState()
     val visitasGps by AgroRepository.visitasGps.collectAsState()
 
-// Obtenemos el contexto actual de Android para revisar el internet real
     val context = LocalContext.current
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Función interna para verificar si hay conexión real a Internet
-    fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-    }
-
-    // Estado reactivo que detecta si estamos offline
     var isOffline by remember { mutableStateOf(!isNetworkAvailable(context)) }
 
-    // Este DisposableEffect vigila el ciclo de vida de la app:
-    // Cada vez que vuelves a abrirla desde segundo plano (onResume), revisa la red al toque.
     DisposableEffect(lifecycleOwner, context) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
                 isOffline = !isNetworkAvailable(context)
             }
         }
@@ -121,10 +129,14 @@ fun HomeContent(
         }
     }
 
-    // Cálculo dinámico ajustado estrictamente a 4 cuarteles
     val totalCuarteles = 4
-    val cuartelesEnRiesgo = telemetriaMap.values.count { it.tieneRiesgo }
-    val bombasEncendidas = actuadoresMap.values.count { it.bombaEncendida }
+
+    // Uso de filter { ... }.size para evitar 'Function invocation count() expected'
+    val cuartelesEnRiesgo = telemetriaMap.values.filter {
+        it.tieneRiesgo || (it.estadoGlobal != "Estado OK" && it.estadoGlobal.isNotBlank())
+    }.size
+
+    val bombasEncendidas = actuadoresMap.values.filter { it.bombaEncendida }.size
 
     val ultimaVisita = visitasGps.firstOrNull()?.let {
         "${it.cuartel} (${it.fechaHora})"
@@ -139,7 +151,7 @@ fun HomeContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Header con indicador dinámico Online / Offline basado en el sistema
+        // Header con indicador dinámico Online / Offline
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -153,7 +165,6 @@ fun HomeContent(
                 )
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // El punto cambia a rojo si no hay internet real en el teléfono
                 Box(
                     modifier = Modifier
                         .size(10.dp)
@@ -174,8 +185,7 @@ fun HomeContent(
             }
         }
 
-
-        // Estado Global
+        // Estado Global del Predio
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -222,7 +232,9 @@ fun HomeContent(
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             val c1 = telemetriaMap["Cuartel 1"]
@@ -243,7 +255,9 @@ fun HomeContent(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Max),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             val c3 = telemetriaMap["Cuartel 3"]
@@ -265,7 +279,6 @@ fun HomeContent(
 
         // Resumen Promedio
         val cuartelesList = telemetriaMap.values.toList()
-        fun extraerNumero(texto: String): Double = texto.replace(Regex("[^0-9.]"), "").toDoubleOrNull() ?: 0.0
 
         val tempProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.1f °C", cuartelesList.sumOf { extraerNumero(it.temperatura) } / cuartelesList.size) else "18.5 °C"
         val humProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f %%", cuartelesList.sumOf { extraerNumero(it.humedadSuelo) } / cuartelesList.size) else "68 %"
@@ -433,25 +446,32 @@ fun CuartelCard(
     onClick: () -> Unit = {}
 ) {
     Card(
-        modifier = modifier.clickable { onClick() },
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = status,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = if (status == "Estado OK") AgroStatusOk else Color(0xFFD9383A)
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
-            )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = if (status == "Estado OK") AgroStatusOk else Color(0xFFD9383A)
+                    )
+                )
+            }
         }
     }
 }
