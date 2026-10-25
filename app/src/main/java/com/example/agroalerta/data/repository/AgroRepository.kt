@@ -52,19 +52,25 @@ object AgroRepository {
                 val guardadas = dbHelper?.obtenerVisitas() ?: emptyList()
                 _visitasGps.value = guardadas
 
-                // 2. Cargar Historial de Alertas Atendidas
+                // 2. Cargar Historial de Alertas Atendidas desde SQLite
                 val historial = dbHelper?.obtenerHistorialAlertasAtendidas() ?: emptyList()
                 _historialAlertas.value = historial
 
-                // 3. Forzar actuadores apagados por defecto en SQLite
-                val defaultActuadores = mapOf(
-                    "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-                    "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-                    "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-                    "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false)
-                )
-                _actuadoresMap.value = defaultActuadores
-                defaultActuadores.values.forEach { dbHelper?.guardarActuador(it) }
+                // 3. Cargar Actuadores desde SQLite (RESPECTANDO EL ESTADO PREVIO)
+                val actuadoresPersistidos = dbHelper?.obtenerActuadores() ?: emptyMap()
+                if (actuadoresPersistidos.isNotEmpty()) {
+                    _actuadoresMap.value = actuadoresPersistidos
+                } else {
+                    // Solo si la base de datos está totalmente vacía asignamos el estado inicial por defecto
+                    val defaultActuadores = mapOf(
+                        "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
+                        "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
+                        "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
+                        "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false)
+                    )
+                    _actuadoresMap.value = defaultActuadores
+                    defaultActuadores.values.forEach { dbHelper?.guardarActuador(it) }
+                }
 
                 // 4. Cargar Telemetría local
                 val datosPersistidos = dbHelper?.obtenerTelemetriaLocal() ?: emptyList()
