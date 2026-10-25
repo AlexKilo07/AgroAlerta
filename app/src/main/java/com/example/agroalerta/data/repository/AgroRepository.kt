@@ -43,7 +43,6 @@ object AgroRepository {
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
 
-    // MANTENIDA TAL CUAL COMO EN TU CÓDIGO ORIGINAL
     fun init(context: Context) {
         if (dbHelper == null) {
             dbHelper = AgroDatabaseHelper(context)
@@ -57,17 +56,16 @@ object AgroRepository {
                 val historial = dbHelper?.obtenerHistorialAlertasAtendidas() ?: emptyList()
                 _historialAlertas.value = historial
 
-                // 3. Cargar Actuadores desde SQLite (RESPECTANDO EL ESTADO PREVIO)
+                // 3. Cargar Actuadores desde SQLite
                 val actuadoresPersistidos = dbHelper?.obtenerActuadores() ?: emptyMap()
                 if (actuadoresPersistidos.isNotEmpty()) {
                     _actuadoresMap.value = actuadoresPersistidos
                 } else {
-                    // Solo si la base de datos está totalmente vacía asignamos el estado inicial por defecto
                     val defaultActuadores = mapOf(
-                        "Cuartel 1" to ActuadorState("Cuartel 1", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-                        "Cuartel 2" to ActuadorState("Cuartel 2", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-                        "Cuartel 3" to ActuadorState("Cuartel 3", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false),
-                        "Cuartel 4" to ActuadorState("Cuartel 4", bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false)
+                        "Cuartel 1" to ActuadorState("Cuartel 1"),
+                        "Cuartel 2" to ActuadorState("Cuartel 2"),
+                        "Cuartel 3" to ActuadorState("Cuartel 3"),
+                        "Cuartel 4" to ActuadorState("Cuartel 4")
                     )
                     _actuadoresMap.value = defaultActuadores
                     defaultActuadores.values.forEach { dbHelper?.guardarActuador(it) }
@@ -241,28 +239,33 @@ object AgroRepository {
         }
     }
 
+    // RESTABLECIMIENTO COMPLETO: Garantiza valores seguros, deshabilita riesgos y apaga actuadores
     fun restablecerCuartel(cuartelId: String) {
         val mapaActual = _telemetriaMap.value.toMutableMap()
-        val actual = mapaActual[cuartelId] ?: TelemetriaCuartel(
+
+        val cuartelRestablecido = TelemetriaCuartel(
             cuartelId = cuartelId,
             temperatura = "19.5 °C",
             humedadSuelo = "65 %",
             caudal = "45 L/min",
             radiacionSolar = "650 W/m²",
-            humedadRelativa = "55 %"
-        )
-
-        val modificado = actual.copy(
-            temperatura = "19.5 °C",
-            humedadSuelo = "65 %",
-            caudal = "45 L/min",
+            humedadRelativa = "55 %",
             tieneRiesgo = false,
             estadoGlobal = "Estado OK"
         )
-        mapaActual[cuartelId] = modificado
+        mapaActual[cuartelId] = cuartelRestablecido
         _telemetriaMap.value = mapaActual
 
-        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
+        // Desactivar actuadores del cuartel
+        val actuadorDesactivado = ActuadorState(cuartelId, bombaEncendida = false, valvulaAbierta = false, antiHeladasActivo = false)
+        val nuevoMapActuadores = _actuadoresMap.value.toMutableMap()
+        nuevoMapActuadores[cuartelId] = actuadorDesactivado
+        _actuadoresMap.value = nuevoMapActuadores
+
+        scope.launch {
+            dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList())
+            dbHelper?.guardarActuador(actuadorDesactivado)
+        }
     }
 
     fun registrarVisitaTerreno(cuartel: String, lat: Double, lng: Double) {
@@ -278,20 +281,15 @@ object AgroRepository {
 
     fun marcarAlertaAtendida(cuartel: String, titulo: String, fechaHora: String) {
         scope.launch {
-            // 1. Guardar la alerta en SQLite para el historial
             dbHelper?.marcarAlertaComoVista(titulo, cuartel, fechaHora)
 
-            // 2. Cargar el historial actualizado de alertas
             val historialActualizado = dbHelper?.obtenerHistorialAlertasAtendidas() ?: emptyList()
             _historialAlertas.value = historialActualizado
 
-            // 3. Quitar la alerta de las activas cambiando únicamente tieneRiesgo = false
-            // IMPORTANTE: No se altera la telemetría ni se fuerza 'Estado OK' aquí;
-            // la telemetría depende exclusivamente de los actuadores o del restablecimiento manual.
             val mapaActual = _telemetriaMap.value.toMutableMap()
             mapaActual[cuartel]?.let { actual ->
                 val modificado = actual.copy(
-                    tieneRiesgo = false // Se retira de la lista de Alertas Activas
+                    tieneRiesgo = false
                 )
                 mapaActual[cuartel] = modificado
                 _telemetriaMap.value = mapaActual
@@ -308,7 +306,6 @@ object AgroRepository {
         }
     }
 
-    // --- MODIFICACIÓN ÚNICA NECESARIA: LOS ACTUADORES NORMALIZAN TELEMETRÍA A 'Estado OK' PERO MANTIENEN 'tieneRiesgo = true' ---
     fun toggleBomba(cuartelId: String) {
         val actual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
         val nuevoEstadoBomba = !actual.bombaEncendida
@@ -324,7 +321,7 @@ object AgroRepository {
                 if (tel.estadoGlobal.contains("Estanque")) {
                     mapaTele[cuartelId] = tel.copy(
                         caudal = "45 L/min",
-                        estadoGlobal = "Estado OK" // Mantiene tieneRiesgo = true para no quitar la alerta
+                        estadoGlobal = "Estado OK"
                     )
                     _telemetriaMap.value = mapaTele
                     scope.launch { dbHelper?.guardarTelemetriaLocal(mapaTele.values.toList()) }
@@ -351,7 +348,7 @@ object AgroRepository {
                     mapaTele[cuartelId] = tel.copy(
                         humedadSuelo = "65 %",
                         caudal = "40 L/min",
-                        estadoGlobal = "Estado OK" // Mantiene tieneRiesgo = true para no quitar la alerta
+                        estadoGlobal = "Estado OK"
                     )
                     _telemetriaMap.value = mapaTele
                     scope.launch { dbHelper?.guardarTelemetriaLocal(mapaTele.values.toList()) }
@@ -377,7 +374,7 @@ object AgroRepository {
                 if (tel.estadoGlobal.contains("Helada")) {
                     mapaTele[cuartelId] = tel.copy(
                         temperatura = "4.5 °C",
-                        estadoGlobal = "Estado OK" // Mantiene tieneRiesgo = true para no quitar la alerta
+                        estadoGlobal = "Estado OK"
                     )
                     _telemetriaMap.value = mapaTele
                     scope.launch { dbHelper?.guardarTelemetriaLocal(mapaTele.values.toList()) }

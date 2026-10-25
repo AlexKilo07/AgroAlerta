@@ -1,5 +1,6 @@
 package com.example.agroalerta.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,16 +23,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.agroalerta.ui.viewmodel.AgroViewModel
 import com.example.agroalerta.ui.theme.AgroBackground
 import com.example.agroalerta.ui.theme.AgroGreenPrimary
 import com.example.agroalerta.ui.theme.AgroStatusOk
 import com.example.agroalerta.ui.theme.AgroTextDark
 import com.example.agroalerta.ui.theme.AgroTextMuted
+import com.example.agroalerta.ui.viewmodel.AgroViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +43,7 @@ fun SettingsScreen(
     onLogoutClick: () -> Unit = {},
     viewModel: AgroViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     var cuartelObjetivo by remember { mutableStateOf("Cuartel 1") }
     var expandedCuartelMenu by remember { mutableStateOf(false) }
     var pushNotificationsEnabled by remember { mutableStateOf(true) }
@@ -183,7 +186,14 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { viewModel.simularHeladaCuartel(cuartelObjetivo) },
+                            onClick = {
+                                viewModel.simularHeladaCuartel(cuartelObjetivo)
+                                Toast.makeText(
+                                    context,
+                                    "Simulación realizada en $cuartelObjetivo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
                             modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9383A)),
@@ -195,7 +205,14 @@ fun SettingsScreen(
                         }
 
                         Button(
-                            onClick = { viewModel.simularBajaHumedadCuartel(cuartelObjetivo) },
+                            onClick = {
+                                viewModel.simularBajaHumedadCuartel(cuartelObjetivo)
+                                Toast.makeText(
+                                    context,
+                                    "Simulación realizada en $cuartelObjetivo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
                             modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
@@ -212,7 +229,14 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { viewModel.simularBajoEstanqueCuartel(cuartelObjetivo) },
+                            onClick = {
+                                viewModel.simularBajoEstanqueCuartel(cuartelObjetivo)
+                                Toast.makeText(
+                                    context,
+                                    "Simulación realizada en $cuartelObjetivo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
                             modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0288D1)),
@@ -224,7 +248,14 @@ fun SettingsScreen(
                         }
 
                         Button(
-                            onClick = { viewModel.restablecerCuartel(cuartelObjetivo) },
+                            onClick = {
+                                viewModel.restablecerCuartel(cuartelObjetivo)
+                                Toast.makeText(
+                                    context,
+                                    "Datos restablecidos en $cuartelObjetivo",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
                             modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary),
@@ -315,7 +346,10 @@ fun SettingsScreen(
                     HorizontalDivider(color = Color(0xFFEEEEEE))
 
                     Button(
-                        onClick = { viewModel.refrescarTelemetria() },
+                        onClick = {
+                            viewModel.refrescarTelemetria()
+                            Toast.makeText(context, "Sincronización completada", Toast.LENGTH_SHORT).show()
+                        },
                         modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary)
