@@ -17,33 +17,34 @@ import java.util.Locale
 
 class AgroViewModel : ViewModel() {
 
-    // 1. Escuchar la telemetría desde AgroRepository
     val telemetriaMap: StateFlow<Map<String, TelemetriaCuartel>> = AgroRepository.telemetriaMap
-
-    // 2. Escuchar el estado de actuadores desde AgroRepository
     val actuadoresMap: StateFlow<Map<String, ActuadorState>> = AgroRepository.actuadoresMap
-
-    // 3. Escuchar las visitas GPS guardadas en SQLite
     val visitasGps: StateFlow<List<VisitaGps>> = AgroRepository.visitasGps
-
-    // 4. Indicador de conectividad Online/Offline
     val isOffline: StateFlow<Boolean> = AgroRepository.isOffline
-
-    // 5. Historial acumulado de alertas marcadas como atendidas desde AgroRepository
     val historialAlertas: StateFlow<List<AlertaItem>> = AgroRepository.historialAlertas
 
-    // 6. Alertas Activas (Se generan dinámicamente según la telemetría de cada cuartel)
+    // Alertas Activas: conserva el título de la alerta aun cuando el estado se normalice a Estado OK
     val alertasActivas: StateFlow<List<AlertaItem>> = telemetriaMap.map { mapa ->
         val formatoHora = SimpleDateFormat("HH:mm", Locale.getDefault())
         val horaActual = formatoHora.format(Date())
 
         mapa.values.filter { it.tieneRiesgo }.mapIndexed { index, telemetria ->
+            val tituloMostrar = if (telemetria.estadoGlobal != "Estado OK") {
+                telemetria.estadoGlobal
+            } else {
+                when (telemetria.cuartelId) {
+                    "Cuartel 3" -> "Riesgo de Helada Crítica"
+                    "Cuartel 4" -> "Baja Humedad Crítica en Suelo"
+                    else -> "Bajo Nivel de Estanque"
+                }
+            }
+
             AlertaItem(
                 id = index + 1,
                 cuartel = telemetria.cuartelId,
-                titulo = telemetria.estadoGlobal,
+                titulo = tituloMostrar,
                 fechaHora = horaActual,
-                esCritica = telemetria.estadoGlobal.contains("Helada") || telemetria.estadoGlobal.contains("Crítica")
+                esCritica = true
             )
         }
     }.stateIn(
@@ -52,17 +53,13 @@ class AgroViewModel : ViewModel() {
         initialValue = emptyList()
     )
 
-    // Marcar como vista: registra la alerta atendida en SQLite con la hora exacta
-    // la traslada de Activas al Historial
     fun marcarAlertaComoVista(alerta: AlertaItem) {
         val formatoHora = SimpleDateFormat("HH:mm - dd/MM", Locale.getDefault())
         val fechaHoraActual = formatoHora.format(Date())
 
-        // 1. Guardar en SQLite y quitar el riesgo temporalmente de la vista activa
         AgroRepository.marcarAlertaAtendida(alerta.cuartel, alerta.titulo, fechaHoraActual)
     }
 
-    // Métodos para controlar actuadores
     fun actualizarBomba(cuartelId: String) {
         AgroRepository.toggleBomba(cuartelId)
     }
@@ -79,7 +76,6 @@ class AgroViewModel : ViewModel() {
         AgroRepository.sincronizarTelemetria()
     }
 
-    // Simulaciones de prueba individuales
     fun simularHeladaCuartel(cuartelId: String) {
         AgroRepository.simularHeladaCuartel(cuartelId)
     }

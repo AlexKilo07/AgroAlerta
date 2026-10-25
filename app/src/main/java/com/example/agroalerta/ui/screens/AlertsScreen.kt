@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Eco
@@ -469,7 +470,8 @@ fun TarjetaAlertaActiva(
     }
 }
 
-// Vista 2: Tarjeta con Línea de Tiempo para Historial de Eventos
+// Vista 2: Tarjeta con Línea de Tiempo para Historial de Eventos (Resaltados en rojo con iconos específicos)
+// Vista 2: Tarjeta con Línea de Tiempo para Historial de Eventos (Resaltados en rojo con icono único por tipo)
 @Composable
 fun TarjetaHistorialTimeline(
     alerta: AlertaItem,
@@ -520,9 +522,17 @@ fun TarjetaHistorialTimeline(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val isHelada = alerta.titulo.contains("Helada", ignoreCase = true)
-                    val iconBgColor = if (isHelada) Color(0xFFFFF0F0) else Color(0xFFE8F5E9)
-                    val iconTint = if (isHelada) Color(0xFFD9383A) else AgroGreenPrimary
+                    // Círculo rojo claro e icono rojo para destacar el evento
+                    val iconBgColor = Color(0xFFFFF0F0)
+                    val iconTint = Color(0xFFD9383A)
+
+                    // Icono diferenciado según el tipo exacto de alerta
+                    val iconoEvento = when {
+                        alerta.titulo.contains("Helada", ignoreCase = true) -> Icons.Default.AcUnit
+                        alerta.titulo.contains("Humedad", ignoreCase = true) -> Icons.Default.WaterDrop
+                        alerta.titulo.contains("Estanque", ignoreCase = true) -> Icons.Default.Warning
+                        else -> Icons.Default.Warning
+                    }
 
                     Box(
                         modifier = Modifier
@@ -532,7 +542,7 @@ fun TarjetaHistorialTimeline(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isHelada) Icons.Default.Warning else Icons.Default.WaterDrop,
+                            imageVector = iconoEvento,
                             contentDescription = null,
                             tint = iconTint,
                             modifier = Modifier.size(24.dp)
@@ -565,7 +575,7 @@ fun TarjetaHistorialTimeline(
                     color = Color(0xFFEDF4EE)
                 ) {
                     Text(
-                        text = if (alerta.esCritica) "Atendida." else "Resuelto.",
+                        text = "Atendida.",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AgroGreenPrimary,
