@@ -144,7 +144,7 @@ object AgroRepository {
         }
     }
 
-    // --- Simulaciones Individuales ---
+    // --- Simulaciones Individuales (Forzar apagar el actuador correspondiente) ---
     fun simularHeladaCuartel(cuartelId: String) {
         val mapaActual = _telemetriaMap.value.toMutableMap()
         val actual = mapaActual[cuartelId] ?: TelemetriaCuartel(
@@ -165,7 +165,17 @@ object AgroRepository {
         mapaActual[cuartelId] = modificado
         _telemetriaMap.value = mapaActual
 
-        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
+        // Alerta de Helada -> Desactivar el Sistema Anti-Heladas
+        val actuadorActual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoActuador = actuadorActual.copy(antiHeladasActivo = false)
+        val nuevoMapActuadores = _actuadoresMap.value.toMutableMap()
+        nuevoMapActuadores[cuartelId] = nuevoActuador
+        _actuadoresMap.value = nuevoMapActuadores
+
+        scope.launch {
+            dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList())
+            dbHelper?.guardarActuador(nuevoActuador)
+        }
     }
 
     fun simularBajaHumedadCuartel(cuartelId: String) {
@@ -188,7 +198,17 @@ object AgroRepository {
         mapaActual[cuartelId] = modificado
         _telemetriaMap.value = mapaActual
 
-        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
+        // Alerta de Baja Humedad -> Cerrar Válvula Solenoide de Riego
+        val actuadorActual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoActuador = actuadorActual.copy(valvulaAbierta = false)
+        val nuevoMapActuadores = _actuadoresMap.value.toMutableMap()
+        nuevoMapActuadores[cuartelId] = nuevoActuador
+        _actuadoresMap.value = nuevoMapActuadores
+
+        scope.launch {
+            dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList())
+            dbHelper?.guardarActuador(nuevoActuador)
+        }
     }
 
     fun simularBajoEstanqueCuartel(cuartelId: String) {
@@ -210,7 +230,17 @@ object AgroRepository {
         mapaActual[cuartelId] = modificado
         _telemetriaMap.value = mapaActual
 
-        scope.launch { dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList()) }
+        // Alerta de Bajo Estanque -> Apagar Bomba Principal de Agua
+        val actuadorActual = _actuadoresMap.value[cuartelId] ?: ActuadorState(cuartelId)
+        val nuevoActuador = actuadorActual.copy(bombaEncendida = false)
+        val nuevoMapActuadores = _actuadoresMap.value.toMutableMap()
+        nuevoMapActuadores[cuartelId] = nuevoActuador
+        _actuadoresMap.value = nuevoMapActuadores
+
+        scope.launch {
+            dbHelper?.guardarTelemetriaLocal(mapaActual.values.toList())
+            dbHelper?.guardarActuador(nuevoActuador)
+        }
     }
 
     fun restablecerCuartel(cuartelId: String) {
