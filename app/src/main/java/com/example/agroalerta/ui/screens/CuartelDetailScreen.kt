@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -42,17 +41,16 @@ import com.google.android.gms.location.LocationServices
 @Composable
 fun CuartelDetailScreen(
     cuartelName: String = "Cuartel 1",
+    usuarioRol: String = "Usuario Administrador",
     onBackClick: () -> Unit = {},
     onNavigateToActuadores: () -> Unit = {},
     onNavigateToHistorial: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    val esTecnico = usuarioRol == "Técnico en Mantenimiento"
 
-    // 1. Escuchar la telemetría en tiempo real desde el Repositorio
     val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
-
-    // 2. Obtener los datos específicos del cuartel seleccionado
     val cuartelInfo = telemetriaMap[cuartelName] ?: TelemetriaCuartel(
         cuartelId = cuartelName,
         temperatura = "-- °C",
@@ -62,30 +60,25 @@ fun CuartelDetailScreen(
         humedadRelativa = "-- %"
     )
 
-    // Obtención de coordenadas GPS reales, guardado en SQLite y navegación al Historial
+    fun estadoSensor(cuartel: TelemetriaCuartel, tipo: String): Pair<String, Color> {
+        val tieneFalla = when (tipo) {
+            "Temp" -> cuartel.estadoGlobal.contains("Helada")
+            "Hum" -> cuartel.estadoGlobal.contains("Humedad")
+            "Caudal" -> cuartel.estadoGlobal.contains("Estanque")
+            else -> false
+        }
+        return if (tieneFalla) "Revisión Requerida" to Color(0xFFD9383A) else "Buen Estado" to AgroGreenPrimary
+    }
+
     @SuppressLint("MissingPermission")
     fun obtenerUbicacionYRegistrar() {
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location != null) {
-                val lat = location.latitude
-                val lng = location.longitude
-
-                AgroRepository.registrarVisitaTerreno(cuartelName, lat, lng)
-
-                Toast.makeText(
-                    context,
-                    "Visita registrada en $cuartelName",
-                    Toast.LENGTH_SHORT
-                ).show()
+                AgroRepository.registrarVisitaTerreno(cuartelName, location.latitude, location.longitude)
+                Toast.makeText(context, "Visita registrada en $cuartelName", Toast.LENGTH_SHORT).show()
             } else {
-                val defaultLat = -33.7251
-                val defaultLng = -70.7320
-                AgroRepository.registrarVisitaTerreno(cuartelName, defaultLat, defaultLng)
-                Toast.makeText(
-                    context,
-                    "Visita registrada (Predio Buin)",
-                    Toast.LENGTH_SHORT
-                ).show()
+                AgroRepository.registrarVisitaTerreno(cuartelName, -33.7251, -70.7320)
+                Toast.makeText(context, "Visita registrada (Predio Buin)", Toast.LENGTH_SHORT).show()
             }
             onNavigateToHistorial()
         }.addOnFailureListener {
@@ -93,18 +86,13 @@ fun CuartelDetailScreen(
         }
     }
 
-    // Gestor de permisos para pedir acceso al GPS en tiempo de ejecución
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
             obtenerUbicacionYRegistrar()
         } else {
-            Toast.makeText(
-                context,
-                "Se requiere permiso GPS para registrar la visita",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(context, "Se requiere permiso GPS para registrar la visita", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -114,11 +102,7 @@ fun CuartelDetailScreen(
                 title = { Text(cuartelName, fontWeight = FontWeight.Bold, color = AgroGreenPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = AgroGreenPrimary
-                        )
+                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Volver", tint = AgroGreenPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AgroBackground)
@@ -134,7 +118,6 @@ fun CuartelDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Botón de Acción Principal: GPS
             Button(
                 onClick = {
                     val tienePermiso = ContextCompat.checkSelfPermission(
@@ -154,45 +137,37 @@ fun CuartelDetailScreen(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary)
             ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = "GPS",
-                    tint = Color.White
-                )
+                Icon(imageVector = Icons.Default.LocationOn, contentDescription = "GPS", tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Registrar visita en terreno (GPS)",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Text("Registrar visita en terreno (GPS)", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
 
             Text(
-                text = "Telemetría en Tiempo Real",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = AgroGreenPrimary
-                )
+                text = if (esTecnico) "Estado de Sensores" else "Telemetría en Tiempo Real",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = AgroGreenPrimary)
             )
 
-            // Grilla de Tarjetas de Sensores
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                val (estadoTemp, colorTemp) = estadoSensor(cuartelInfo, "Temp")
                 SensorCard(
                     icon = Icons.Default.Thermostat,
                     iconTint = Color(0xFFE57373),
-                    title = "Temperatura",
-                    value = cuartelInfo.temperatura,
+                    title = "Sensor Temperatura",
+                    value = if (esTecnico) estadoTemp else cuartelInfo.temperatura,
+                    valueColor = if (esTecnico) colorTemp else AgroTextDark,
                     modifier = Modifier.weight(1f)
                 )
+
+                val (estadoHum, colorHum) = estadoSensor(cuartelInfo, "Hum")
                 SensorCard(
                     icon = Icons.Default.WaterDrop,
                     iconTint = Color(0xFF64B5F6),
-                    title = "Humedad Suelo",
-                    value = cuartelInfo.humedadSuelo,
+                    title = "Sensor Humedad Suelo",
+                    value = if (esTecnico) estadoHum else cuartelInfo.humedadSuelo,
+                    valueColor = if (esTecnico) colorHum else AgroTextDark,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -201,61 +176,39 @@ fun CuartelDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                val (estadoCaudal, colorCaudal) = estadoSensor(cuartelInfo, "Caudal")
                 SensorCard(
                     icon = Icons.Default.Speed,
                     iconTint = Color(0xFF81C784),
-                    title = "Caudal",
-                    value = cuartelInfo.caudal,
+                    title = "Sensor Caudal",
+                    value = if (esTecnico) estadoCaudal else cuartelInfo.caudal,
+                    valueColor = if (esTecnico) colorCaudal else AgroTextDark,
                     modifier = Modifier.weight(1f)
                 )
+
                 SensorCard(
                     icon = Icons.Default.WbSunny,
                     iconTint = Color(0xFFFFB74D),
-                    title = "Radiación Solar",
-                    value = cuartelInfo.radiacionSolar,
+                    title = "Sensor Radiación",
+                    value = if (esTecnico) "Buen Estado" else cuartelInfo.radiacionSolar,
+                    valueColor = if (esTecnico) AgroGreenPrimary else AgroTextDark,
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SensorCard(
-                    icon = Icons.Default.WaterDrop,
-                    iconTint = Color(0xFF4DD0E1),
-                    title = "Humedad Relativa",
-                    value = cuartelInfo.humedadRelativa,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.weight(1f))
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Nuevo Botón Moderno de Acceso a Actuadores
             Button(
                 onClick = onNavigateToActuadores,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Power,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
+                Icon(imageVector = Icons.Default.Power, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Panel de Actuadores",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    text = if (esTecnico) "Estado de Actuadores" else "Panel de Actuadores",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
                 )
             }
         }
@@ -268,6 +221,7 @@ fun SensorCard(
     iconTint: Color,
     title: String,
     value: String,
+    valueColor: Color = AgroTextDark,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -290,35 +244,12 @@ fun SensorCard(
                     .background(iconTint.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = iconTint,
-                    modifier = Modifier.size(28.dp)
-                )
+                Icon(imageVector = icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(28.dp))
             }
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = title,
-                fontSize = 13.sp,
-                color = AgroTextMuted,
-                fontWeight = FontWeight.Medium
-            )
+            Text(text = title, fontSize = 12.sp, color = AgroTextMuted, fontWeight = FontWeight.Medium)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = AgroTextDark
-            )
+            Text(text = value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = valueColor)
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun CuartelDetailScreenPreview() {
-    AgroAlertaTheme {
-        CuartelDetailScreen()
     }
 }

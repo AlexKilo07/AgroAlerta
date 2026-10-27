@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -60,6 +59,7 @@ fun extraerNumero(texto: String): Double {
 fun HomeScreen(
     modifier: Modifier = Modifier,
     selectedTab: Int = 0,
+    usuarioRol: String = "Usuario Administrador",
     onCuartelSelected: (String) -> Unit = {},
     onNavigateToInicio: () -> Unit = {},
     onNavigateToAlertas: () -> Unit = {},
@@ -67,10 +67,13 @@ fun HomeScreen(
     content: @Composable (PaddingValues) -> Unit = { innerPadding ->
         HomeContent(
             paddingValues = innerPadding,
+            usuarioRol = usuarioRol,
             onCuartelSelected = onCuartelSelected
         )
     }
 ) {
+    val esTecnico = usuarioRol == "Técnico en Mantenimiento"
+
     Scaffold(
         modifier = modifier,
         bottomBar = {
@@ -78,18 +81,25 @@ fun HomeScreen(
                 containerColor = AgroGreenLight,
                 tonalElevation = 8.dp
             ) {
+                // Pestaña Inicio (Para todos los usuarios)
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { onNavigateToInicio() },
                     icon = { Icon(Icons.Default.Home, contentDescription = "Inicio") },
                     label = { Text("Inicio") }
                 )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { onNavigateToAlertas() },
-                    icon = { Icon(Icons.Default.Notifications, contentDescription = "Alertas") },
-                    label = { Text("Alertas") }
-                )
+
+                // Pestaña Alertas (Oculta para Técnico en Mantenimiento)
+                if (!esTecnico) {
+                    NavigationBarItem(
+                        selected = selectedTab == 1,
+                        onClick = { onNavigateToAlertas() },
+                        icon = { Icon(Icons.Default.Notifications, contentDescription = "Alertas") },
+                        label = { Text("Alertas") }
+                    )
+                }
+
+                // Pestaña Ajustes (Para todos los usuarios)
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { onNavigateToAjustes() },
@@ -106,8 +116,10 @@ fun HomeScreen(
 @Composable
 fun HomeContent(
     paddingValues: PaddingValues,
+    usuarioRol: String = "Usuario Administrador",
     onCuartelSelected: (String) -> Unit
 ) {
+    val esTecnico = usuarioRol == "Técnico en Mantenimiento"
     val telemetriaMap by AgroRepository.telemetriaMap.collectAsState()
     val actuadoresMap by AgroRepository.actuadoresMap.collectAsState()
     val visitasGps by AgroRepository.visitasGps.collectAsState()
@@ -130,14 +142,11 @@ fun HomeContent(
     }
 
     val totalCuarteles = 4
-
-    // Uso de filter { ... }.size para evitar 'Function invocation count() expected'
     val cuartelesEnRiesgo = telemetriaMap.values.filter {
         it.tieneRiesgo || (it.estadoGlobal != "Estado OK" && it.estadoGlobal.isNotBlank())
     }.size
 
     val bombasEncendidas = actuadoresMap.values.filter { it.bombaEncendida }.size
-
     val ultimaVisita = visitasGps.firstOrNull()?.let {
         "${it.cuartel} (${it.fechaHora})"
     } ?: "Sin registros hoy"
@@ -151,7 +160,6 @@ fun HomeContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Header con indicador dinámico Online / Offline
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -185,7 +193,6 @@ fun HomeContent(
             }
         }
 
-        // Estado Global del Predio
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -222,7 +229,6 @@ fun HomeContent(
             }
         }
 
-        // Selección de Cuarteles
         Text(
             text = "Seleccionar Cuartel",
             style = MaterialTheme.typography.titleLarge.copy(
@@ -277,135 +283,82 @@ fun HomeContent(
             )
         }
 
-        // Resumen Promedio
-        val cuartelesList = telemetriaMap.values.toList()
+        if (!esTecnico) {
+            val cuartelesList = telemetriaMap.values.toList()
+            val tempProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.1f °C", cuartelesList.sumOf { extraerNumero(it.temperatura) } / cuartelesList.size) else "18.5 °C"
+            val humProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f %%", cuartelesList.sumOf { extraerNumero(it.humedadSuelo) } / cuartelesList.size) else "68 %"
+            val caudalProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f L/min", cuartelesList.sumOf { extraerNumero(it.caudal) } / cuartelesList.size) else "45 L/min"
+            val radProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f W/m²", cuartelesList.sumOf { extraerNumero(it.radiacionSolar) } / cuartelesList.size) else "650 W/m²"
 
-        val tempProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.1f °C", cuartelesList.sumOf { extraerNumero(it.temperatura) } / cuartelesList.size) else "18.5 °C"
-        val humProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f %%", cuartelesList.sumOf { extraerNumero(it.humedadSuelo) } / cuartelesList.size) else "68 %"
-        val caudalProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f L/min", cuartelesList.sumOf { extraerNumero(it.caudal) } / cuartelesList.size) else "45 L/min"
-        val radProm = if (cuartelesList.isNotEmpty()) String.format(Locale.US, "%.0f W/m²", cuartelesList.sumOf { extraerNumero(it.radiacionSolar) } / cuartelesList.size) else "650 W/m²"
-
-        Text(
-            text = "Resumen General del Predio (Promedio)",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = AgroGreenPrimary
+            Text(
+                text = "Resumen General del Predio (Promedio)",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = AgroGreenPrimary
+                )
             )
-        )
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    MetricItem(
-                        icon = Icons.Default.Thermostat,
-                        iconTint = Color(0xFFE57373),
-                        label = "Temp. Promedio",
-                        value = tempProm,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        icon = Icons.Default.WaterDrop,
-                        iconTint = Color(0xFF64B5F6),
-                        label = "Humedad Suelo",
-                        value = humProm,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    MetricItem(
-                        icon = Icons.Default.Speed,
-                        iconTint = Color(0xFF81C784),
-                        label = "Caudal Riego",
-                        value = caudalProm,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        icon = Icons.Default.WbSunny,
-                        iconTint = Color(0xFFFFB74D),
-                        label = "Radiación Solar",
-                        value = radProm,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        MetricItem(icon = Icons.Default.Thermostat, iconTint = Color(0xFFE57373), label = "Temp. Promedio", value = tempProm, modifier = Modifier.weight(1f))
+                        MetricItem(icon = Icons.Default.WaterDrop, iconTint = Color(0xFF64B5F6), label = "Humedad Suelo", value = humProm, modifier = Modifier.weight(1f))
+                    }
+                    HorizontalDivider(color = Color(0xFFEEEEEE))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        MetricItem(icon = Icons.Default.Speed, iconTint = Color(0xFF81C784), label = "Caudal Riego", value = caudalProm, modifier = Modifier.weight(1f))
+                        MetricItem(icon = Icons.Default.WbSunny, iconTint = Color(0xFFFFB74D), label = "Radiación Solar", value = radProm, modifier = Modifier.weight(1f))
+                    }
                 }
             }
-        }
 
-        // Centro de Control Operativo
-        Text(
-            text = "Centro de Control Operativo",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = AgroGreenPrimary
+            Text(
+                text = "Centro de Control Operativo",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = AgroGreenPrimary
+                )
             )
-        )
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    MetricItem(
-                        icon = Icons.Default.Power,
-                        iconTint = Color(0xFF4CAF50),
-                        label = "Bombas Activas",
-                        value = "$bombasEncendidas / $totalCuarteles encendidas",
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        icon = Icons.Default.Shield,
-                        iconTint = Color(0xFF2196F3),
-                        label = "Zonas Protegidas",
-                        value = "${totalCuarteles - cuartelesEnRiesgo} / $totalCuarteles en OK",
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    MetricItem(
-                        icon = Icons.Default.Warning,
-                        iconTint = Color(0xFFFF9800),
-                        label = "Alertas Activas",
-                        value = "$cuartelesEnRiesgo pendientes",
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricItem(
-                        icon = Icons.Default.LocationOn,
-                        iconTint = Color(0xFF9C27B0),
-                        label = "Último Registro GPS",
-                        value = ultimaVisita,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        MetricItem(icon = Icons.Default.Power, iconTint = Color(0xFF4CAF50), label = "Bombas Activas", value = "$bombasEncendidas / $totalCuarteles encendidas", modifier = Modifier.weight(1f))
+                        MetricItem(icon = Icons.Default.Shield, iconTint = Color(0xFF2196F3), label = "Zonas Protegidas", value = "${totalCuarteles - cuartelesEnRiesgo} / $totalCuarteles en OK", modifier = Modifier.weight(1f))
+                    }
+                    HorizontalDivider(color = Color(0xFFEEEEEE))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        MetricItem(icon = Icons.Default.Warning, iconTint = Color(0xFFFF9800), label = "Alertas Activas", value = "$cuartelesEnRiesgo pendientes", modifier = Modifier.weight(1f))
+                        MetricItem(icon = Icons.Default.LocationOn, iconTint = Color(0xFF9C27B0), label = "Último Registro GPS", value = ultimaVisita, modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -472,16 +425,6 @@ fun CuartelCard(
                     )
                 )
             }
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    AgroAlertaTheme {
-        HomeScreen { padding ->
-            HomeContent(paddingValues = padding, onCuartelSelected = {})
         }
     }
 }

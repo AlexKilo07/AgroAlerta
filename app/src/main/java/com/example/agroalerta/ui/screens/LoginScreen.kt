@@ -42,8 +42,11 @@ fun LoginScreen(
     // Base de datos simulada de usuarios válidos
     val usuariosValidos = mapOf(
         "admin" to Pair("1234", Pair("Administrador General", "Usuario Administrador")),
-        "operador" to Pair("4321", Pair("Juan Pérez", "Operador de Terreno"))
+        "operador" to Pair("4321", Pair("Juan Pérez", "Operador de Terreno")),
+        "tecnico" to Pair("1234", Pair("Carlos Gómez", "Técnico en Mantenimiento"))
     )
+
+
 
     fun validarYIngresar() {
         val userTrim = usuario.trim()

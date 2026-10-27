@@ -44,6 +44,8 @@ fun SettingsScreen(
     viewModel: AgroViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val esTecnico = usuarioRol == "Técnico en Mantenimiento"
+
     var cuartelObjetivo by remember { mutableStateOf("Cuartel 1") }
     var expandedCuartelMenu by remember { mutableStateOf(false) }
     var pushNotificationsEnabled by remember { mutableStateOf(true) }
@@ -74,7 +76,7 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Sección Perfil
+            // 1. Sección Perfil (Visible para TODOS)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -106,260 +108,247 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. Simulador de Telemetría
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            // OPCIONES SOLO PARA ADMINISTRADOR / OPERADOR
+            if (!esTecnico) {
+                // 2. Simulador de Telemetría
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Thermostat,
-                            contentDescription = null,
-                            tint = AgroGreenPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Simulador de Riesgos",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AgroGreenPrimary
-                        )
-                    }
-
-                    HorizontalDivider(color = Color(0xFFEEEEEE))
-
-                    Text(
-                        text = "Selecciona un cuartel para cambiar su clima en vivo:",
-                        fontSize = 12.sp,
-                        color = AgroTextMuted
-                    )
-
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp),
-                            onClick = { expandedCuartelMenu = true },
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text("Cuartel Objetivo", fontSize = 10.sp, color = AgroTextMuted)
-                                    Text(cuartelObjetivo, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AgroTextDark)
-                                }
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AgroGreenPrimary)
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = expandedCuartelMenu,
-                            onDismissRequest = { expandedCuartelMenu = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            listaCuarteles.forEach { cuartel ->
-                                DropdownMenuItem(
-                                    text = { Text(cuartel) },
-                                    onClick = {
-                                        cuartelObjetivo = cuartel
-                                        expandedCuartelMenu = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(
-                            onClick = {
-                                viewModel.simularHeladaCuartel(cuartelObjetivo)
-                                Toast.makeText(
-                                    context,
-                                    "Simulación realizada en $cuartelObjetivo",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            modifier = Modifier.weight(1f).height(42.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9383A)),
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Icon(Icons.Default.AcUnit, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Helada", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = {
-                                viewModel.simularBajaHumedadCuartel(cuartelObjetivo)
-                                Toast.makeText(
-                                    context,
-                                    "Simulación realizada en $cuartelObjetivo",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            modifier = Modifier.weight(1f).height(42.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Icon(Icons.Default.WaterDrop, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Baja Humedad", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.simularBajoEstanqueCuartel(cuartelObjetivo)
-                                Toast.makeText(
-                                    context,
-                                    "Simulación realizada en $cuartelObjetivo",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            modifier = Modifier.weight(1f).height(42.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0288D1)),
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Estanque Bajo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = {
-                                viewModel.restablecerCuartel(cuartelObjetivo)
-                                Toast.makeText(
-                                    context,
-                                    "Datos restablecidos en $cuartelObjetivo",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            modifier = Modifier.weight(1f).height(42.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary),
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Restablecer", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            // 3. Notificaciones
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = null,
-                            tint = AgroGreenPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Notificaciones",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AgroGreenPrimary
-                        )
-                    }
-
-                    HorizontalDivider(color = Color(0xFFEEEEEE))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Alertas Críticas (Push)", fontSize = 13.sp, color = AgroTextDark)
-                        Switch(
-                            checked = pushNotificationsEnabled,
-                            onCheckedChange = { pushNotificationsEnabled = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = AgroGreenPrimary
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Thermostat,
+                                contentDescription = null,
+                                tint = AgroGreenPrimary,
+                                modifier = Modifier.size(20.dp)
                             )
-                        )
-                    }
-                }
-            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Simulador de Riesgos",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AgroGreenPrimary
+                            )
+                        }
 
-            // 4. Sincronización
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            tint = AgroGreenPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        HorizontalDivider(color = Color(0xFFEEEEEE))
+
                         Text(
-                            text = "Sincronización",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AgroGreenPrimary
+                            text = "Selecciona un cuartel para cambiar su clima en vivo:",
+                            fontSize = 12.sp,
+                            color = AgroTextMuted
                         )
+
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                onClick = { expandedCuartelMenu = true },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Cuartel Objetivo", fontSize = 10.sp, color = AgroTextMuted)
+                                        Text(cuartelObjetivo, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = AgroTextDark)
+                                    }
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AgroGreenPrimary)
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = expandedCuartelMenu,
+                                onDismissRequest = { expandedCuartelMenu = false },
+                                modifier = Modifier.fillMaxWidth(0.85f)
+                            ) {
+                                listaCuarteles.forEach { cuartel ->
+                                    DropdownMenuItem(
+                                        text = { Text(cuartel) },
+                                        onClick = {
+                                            cuartelObjetivo = cuartel
+                                            expandedCuartelMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    viewModel.simularHeladaCuartel(cuartelObjetivo)
+                                    Toast.makeText(context, "Simulación realizada en $cuartelObjetivo", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD9383A)),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Icon(Icons.Default.AcUnit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Helada", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    viewModel.simularBajaHumedadCuartel(cuartelObjetivo)
+                                    Toast.makeText(context, "Simulación realizada en $cuartelObjetivo", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Icon(Icons.Default.WaterDrop, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Baja Humedad", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    viewModel.simularBajoEstanqueCuartel(cuartelObjetivo)
+                                    Toast.makeText(context, "Simulación realizada en $cuartelObjetivo", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0288D1)),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Estanque Bajo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    viewModel.restablecerCuartel(cuartelObjetivo)
+                                    Toast.makeText(context, "Datos restablecidos en $cuartelObjetivo", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f).height(42.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Restablecer", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
+                }
 
-                    HorizontalDivider(color = Color(0xFFEEEEEE))
-
-                    Button(
-                        onClick = {
-                            viewModel.refrescarTelemetria()
-                            Toast.makeText(context, "Sincronización completada", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary)
+                // 3. Notificaciones
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Sincronizar datos", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = AgroGreenPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Notificaciones",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AgroGreenPrimary
+                            )
+                        }
+
+                        HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Alertas Críticas (Push)", fontSize = 13.sp, color = AgroTextDark)
+                            Switch(
+                                checked = pushNotificationsEnabled,
+                                onCheckedChange = { pushNotificationsEnabled = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = AgroGreenPrimary
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // 4. Sincronización
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = AgroGreenPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Sincronización",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = AgroGreenPrimary
+                            )
+                        }
+
+                        HorizontalDivider(color = Color(0xFFEEEEEE))
+
+                        Button(
+                            onClick = {
+                                viewModel.refrescarTelemetria()
+                                Toast.makeText(context, "Sincronización completada", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AgroGreenPrimary)
+                        ) {
+                            Text("Sincronizar datos", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
 
-            // 5. Acerca de la App
+            // 5. Acerca de la App (Visible para TODOS)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -406,7 +395,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 6. Botón Cerrar Sesión
+            // 6. Botón Cerrar Sesión (Visible para TODOS)
             OutlinedButton(
                 onClick = onLogoutClick,
                 modifier = Modifier

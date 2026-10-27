@@ -24,10 +24,11 @@ import com.example.agroalerta.ui.theme.*
 @Composable
 fun ActuadoresScreen(
     cuartelName: String = "Cuartel 1",
+    usuarioRol: String = "Usuario Administrador",
     onBackClick: () -> Unit = {},
     viewModel: AgroViewModel = viewModel()
 ) {
-    // Escuchar el estado de actuadores desde el ViewModel
+    val esTecnico = usuarioRol == "Técnico en Mantenimiento"
     val actuadoresMap by viewModel.actuadoresMap.collectAsState()
     val estadoActual = actuadoresMap[cuartelName] ?: ActuadorState(cuartelName)
 
@@ -43,11 +44,7 @@ fun ActuadoresScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = AgroGreenPrimary
-                        )
+                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Volver", tint = AgroGreenPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AgroBackground)
@@ -64,34 +61,31 @@ fun ActuadoresScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Control de Riego y Mitigación",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = AgroGreenPrimary
-                )
+                text = if (esTecnico) "Supervisión de Actuadores" else "Control de Riego y Mitigación",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = AgroGreenPrimary)
             )
 
-            // 1. Control de Bomba Principal
             ActuadorCard(
                 title = "Bomba Principal de Agua",
                 subtitle = if (estadoActual.bombaEncendida) "Estado: Encendida (Bombeando)" else "Estado: Apagada",
                 isActive = estadoActual.bombaEncendida,
+                esTecnico = esTecnico,
                 onCheckedChange = { viewModel.actualizarBomba(cuartelName) }
             )
 
-            // 2. Control de Válvula Solenoide de Riego
             ActuadorCard(
                 title = "Válvula Solenoide de Riego",
                 subtitle = if (estadoActual.valvulaAbierta) "Estado: Abierta (Flujo activo)" else "Estado: Cerrada",
                 isActive = estadoActual.valvulaAbierta,
+                esTecnico = esTecnico,
                 onCheckedChange = { viewModel.actualizarValvula(cuartelName) }
             )
 
-            // 3. Sistema de Mitigación de Heladas (Independiente)
             ActuadorCard(
                 title = "Sistema Anti-Heladas (Asistido)",
                 subtitle = if (estadoActual.antiHeladasActivo) "Estado: Activado (Protección activa)" else "Estado: Inactivo",
                 isActive = estadoActual.antiHeladasActivo,
+                esTecnico = esTecnico,
                 onCheckedChange = { viewModel.actualizarAntiHeladas(cuartelName) }
             )
         }
@@ -103,6 +97,7 @@ fun ActuadorCard(
     title: String,
     subtitle: String,
     isActive: Boolean,
+    esTecnico: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Card(
@@ -119,27 +114,34 @@ fun ActuadorCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = AgroTextDark
-                )
+                Text(text = title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = AgroTextDark)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 13.sp,
-                    color = if (isActive) AgroGreenPrimary else AgroTextMuted
+                Text(text = subtitle, fontSize = 13.sp, color = if (isActive) AgroGreenPrimary else AgroTextMuted)
+            }
+
+            if (esTecnico) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFEDF4EE)
+                ) {
+                    Text(
+                        text = "Buen Estado",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AgroGreenPrimary,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            } else {
+                Switch(
+                    checked = isActive,
+                    onCheckedChange = onCheckedChange,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = AgroGreenPrimary
+                    )
                 )
             }
-            Switch(
-                checked = isActive,
-                onCheckedChange = onCheckedChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = AgroGreenPrimary
-                )
-            )
         }
     }
 }

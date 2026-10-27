@@ -24,13 +24,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Inicializar SQLite nativo de Android
         AgroRepository.init(applicationContext)
 
         enableEdgeToEdge()
         setContent {
             AgroAlertaTheme {
-                // Verificar si hay una sesión activa de menos de 1 hora
                 val sesionActiva = remember { SessionManager.esSesionValida(applicationContext) }
 
                 var currentScreen by remember {
@@ -55,7 +53,6 @@ class MainActivity : ComponentActivity() {
                     "login" -> {
                         LoginScreen(
                             onLoginSuccess = { nombre, rol ->
-                                // Guardar sesión de 1 hora en SharedPreferences
                                 SessionManager.guardarSesion(applicationContext, nombre, rol)
                                 usuarioActualNombre = nombre
                                 usuarioActualRol = rol
@@ -73,6 +70,7 @@ class MainActivity : ComponentActivity() {
 
                         HomeScreen(
                             selectedTab = activeTab,
+                            usuarioRol = usuarioActualRol,
                             onNavigateToInicio = { currentScreen = "home" },
                             onNavigateToAlertas = { currentScreen = "alerts" },
                             onNavigateToAjustes = { currentScreen = "settings" }
@@ -80,6 +78,7 @@ class MainActivity : ComponentActivity() {
                             when (currentScreen) {
                                 "home" -> HomeContent(
                                     paddingValues = paddingValues,
+                                    usuarioRol = usuarioActualRol,
                                     onCuartelSelected = { name ->
                                         selectedCuartel = name
                                         currentScreen = "detail"
@@ -95,7 +94,6 @@ class MainActivity : ComponentActivity() {
                                         usuarioNombre = usuarioActualNombre,
                                         usuarioRol = usuarioActualRol,
                                         onLogoutClick = {
-                                            // Limpiar sesión local y volver al Login
                                             SessionManager.cerrarSesion(applicationContext)
                                             currentScreen = "login"
                                         }
@@ -108,6 +106,7 @@ class MainActivity : ComponentActivity() {
                     "detail" -> {
                         CuartelDetailScreen(
                             cuartelName = selectedCuartel,
+                            usuarioRol = usuarioActualRol,
                             onBackClick = { currentScreen = "home" },
                             onNavigateToActuadores = { currentScreen = "actuadores" },
                             onNavigateToHistorial = { currentScreen = "historial" }
@@ -117,6 +116,7 @@ class MainActivity : ComponentActivity() {
                     "actuadores" -> {
                         ActuadoresScreen(
                             cuartelName = selectedCuartel,
+                            usuarioRol = usuarioActualRol,
                             onBackClick = { currentScreen = "detail" }
                         )
                     }
